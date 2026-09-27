@@ -32,7 +32,7 @@ if (process.argv[2] === '--run') {
 	// (SSR html -> hydrate -> interactions) and print the probe ids that fired
 	const hit = new Set<number>();
 	(globalThis as any).__cov = (id: number) => hit.add(id);
-	const { harness } = await import('../check.ts');
+	const { harness } = await import('../harness.ts');
 	const res = await harness(process.argv[3], process.argv[4], process.argv[5]);
 	if (!res.ok) throw new Error(`instrumented bundle failed its test: ${JSON.stringify(res)}`);
 	console.log(JSON.stringify([...hit]));

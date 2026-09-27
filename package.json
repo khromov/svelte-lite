@@ -16,6 +16,7 @@
 		"typecheck": "bun node_modules/svelte/node_modules/typescript/bin/tsc -p .",
 		"postinstall": "bun scripts/link-svelte.ts",
 		"coverage": "bun scripts/coverage.ts",
+		"coverage:bytes": "bun scripts/byte-coverage.ts",
 		"negative": "bun scripts/negative.ts",
 		"patches": "bun scripts/patches-doc.ts",
 		"comparison": "bun scripts/comparison.ts",

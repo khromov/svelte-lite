@@ -25,7 +25,7 @@
  *   report.json/.md   sizes + attribution (measure.ts); coverage.json/.md (scripts/coverage.ts)
  *
  * All three client builds use identical options except `minify`. Variants with
- * `privateDce` additionally run postpass.ts on main.min.js / main.readable.js.
+ * `postpass` additionally run postpass.ts on main.min.js / main.readable.js.
  */
 import type { BuildConfig } from "bun";
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
@@ -49,7 +49,7 @@ ensureSvelteLink(); // also fails if the Svelte checkout has uncommitted changes
 // Imported after the symlink exists: these pull in `svelte/compiler`.
 const { sveltePlugin } = await import("./plugins/svelte.ts");
 const { patchPlugin } = await import("./plugins/patch.ts");
-const { privateDce } = await import("./postpass.ts");
+const { postpass } = await import("./postpass.ts");
 
 export const APPS = readdirSync(join(ROOT, "apps")).filter((a) =>
   existsSync(join(ROOT, "apps", a, "client.js")),
@@ -288,10 +288,10 @@ export async function buildApp(name: string, variant: Variant, app: string) {
     await Bun.file(join(outdir, "main.readable.js")).text(),
     `${name}/${app}`,
   );
-  if (variant.privateDce) {
-    const removed = await privateDce(outdir);
+  if (variant.postpass) {
+    const removed = await postpass(outdir);
     log.push(
-      `post-pass: removed unreferenced private members: ${removed.join(", ") || "(none)"}`,
+      `post-pass: removed dead private members / statements: ${removed.join(", ") || "(none)"}`,
     );
   }
   await buildHtml(name, variant, app);

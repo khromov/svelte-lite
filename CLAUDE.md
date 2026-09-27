@@ -32,6 +32,7 @@ bun run build.ts --all               # every variant x app; about 15 min (covera
 bun run check.ts [variant]           # happy-dom check + patch anchors + negative tests
 bun run test:svelte <variant> [--suite=runtime-runes] [--filter=<sample>] [--without=PROXY] [--async=on|off] [--fresh]
 bun run compare                      # size table: baseline vs optimized vs minimal
+bun run coverage:bytes [variant] [--app=x]   # V8 block coverage -> COVERAGE.md (needs Node >= 26 on PATH)
 
 bun run patches                      # regenerate PATCHES.md
 bun run comparison                   # regenerate COMPARISON.md (needs coverage.json: build without --no-coverage)
@@ -65,9 +66,11 @@ bun run test:svelte --report         # regenerate SVELTE_TESTS.md from saved res
 | `plugins/patch.ts` | Patch engine: `replace`, `removeMembers`, `removeFunctions`, `replaceFunctions`, `prepend`, `contents`, `constImports` |
 | `plugins/svelte.ts` | `.svelte` compile plugin, named imports, build-time bans |
 | `plugins/transform-compiled.js` | Compiled-output rewrite `$.set(x, v, true)` → `$.set(x, $.proxy(v))`; shared by the build and the test helper |
-| `postpass.ts` | Deletes unreferenced `#private` class members from the output (Bun never does) |
+| `postpass.ts` | Removes dead code Bun leaves in the output: unreferenced `#private` class members, constant-false branches and statements after `return`/`throw`. It repeats until nothing changes, then re-bundles |
 | `scripts/link-svelte.ts` | **The single source of truth** for Svelte's location: `SVELTE_DIR`, `SVELTE_REPO`, `SVELTE_INFO`. Never hard-code `../svelte` |
 | `scripts/vendor-svelte.ts` | Vendoring into `vendor/svelte/<ref>/` (one shallow clone per ref, pnpm install from the checkout's own lockfile) |
+| `harness.ts` | The behavioural test harness (SSR HTML → `hydrate()` → `apps/<app>/test.ts` in happy-dom). Runtime-neutral (`node:` APIs only), so Bun (`check.ts`) and Node run the same thing |
+| `scripts/byte-coverage.ts`, `scripts/v8-coverage.ts` | Byte-level coverage: runs the harness under Node with V8 block coverage, attributes never-executed bytes of `main.min.js` to functions, scans for provably dead code, writes `COVERAGE.md` and `dist/<variant>/<app>/coverage.readable.txt` (per-line gutter). `scripts/coverage.ts` is the older function-level view, which overstates usage |
 | `scripts/svelte-tests.ts` | Runs Svelte's official Vitest suites on disposable patched copies in `.cache/svelte-test/` and diffs against unpatched Svelte |
 | `dist/<variant>/<app>/` | Build output. `main.min.js` is the measured number; read `main.readable.js` (same dead-code elimination, readable names, module markers) |
 
@@ -80,6 +83,7 @@ bun run test:svelte --report         # regenerate SVELTE_TESTS.md from saved res
 | `COMPARISON.md` | Sizes and stacking table |
 | `PATCHES.md` | Every patch, generated |
 | `SVELTE_TESTS.md` | Results of Svelte's own test suite |
+| `COVERAGE.md` | How much of each shipped bundle executes, and the provably dead bytes. Generated, except the hand-written notes block |
 
 ## Svelte source selection
 
@@ -113,6 +117,11 @@ Most of the work here exists because Bun eliminates much less dead code than Rol
   - A module-level `const` only folds if it comes before every import and statement, and never in a module that has `export { x } from '…'`.
   - A function-local `const` only folds if it is the first statement in the function body; after a `var` it silently turns into a `let`.
   - A `let` never folds, which is why the flags `hydrating`, `legacy_mode_flag` and `async_mode_flag` need patches.
+- **Bun keeps dead code in two more cases:**
+  - a constant-false block that declares a `var`. `if (!1) { var x; for (…) … }` is kept whole, loops and conditions included, although only the hoisted `var` names need to survive.
+  - statements after a `return` or `throw`. This happens, for example, once a flag const turns a guard into an unconditional `return`, as in `Batch.apply()` when `async_mode_flag` is false.
+  
+  `postpass.ts` removes both kinds (variants with `postpass: true`). `bun run coverage:bytes` reports any that remain, which should be 0 B.
 - **Bun never removes class members,** not even unreferenced `#private` ones. Use `removeMembers` or `postpass.ts`.
 - **Other dead code Bun keeps:**
   - unused nested functions;

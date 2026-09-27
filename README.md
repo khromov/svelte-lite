@@ -34,6 +34,7 @@ bun run test:svelte minimal    # Svelte's own test suite against the patched run
 | [COMPARISON.md](COMPARISON.md) | Sizes, and savings per feature |
 | [PATCHES.md](PATCHES.md) | Every patch and why it exists |
 | [SVELTE_TESTS.md](SVELTE_TESTS.md) | Results of Svelte's official test suite |
+| [COVERAGE.md](COVERAGE.md) | How much of each bundle actually executes, and what never runs |
 | [FEATURE_REPORT.md](FEATURE_REPORT.md) | Runtime feature and LOC map |
 | [BASELINE.md](BASELINE.md) | Bun setup and the dead code in vanilla builds |
 | [CLAUDE.md](CLAUDE.md) | Working notes: ground rules, Bun gotchas, pitfalls |

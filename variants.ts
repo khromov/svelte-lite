@@ -39,8 +39,8 @@ export interface Variant {
 	constImports?: ConstImport[];
 	patches?: SourcePatch[];
 	plugins?: BunPlugin[];
-	/** Run the dead-private-member post-pass (postpass.ts). */
-	privateDce?: boolean;
+	/** Run the post-pass (postpass.ts): dead private members + provably dead statements. */
+	postpass?: boolean;
 }
 
 /** A named slice of a variant (patches + options) that serves one feature. */
@@ -63,7 +63,7 @@ export function stack(description: string, ...parts: Technique[]): Variant {
 	return out;
 }
 
-const OPTIMIZED: Technique[] = [DEV_CONST, NAMED_IMPORTS, PURE, DISCLOSE, { privateDce: true }];
+const OPTIMIZED: Technique[] = [DEV_CONST, NAMED_IMPORTS, PURE, DISCLOSE, { postpass: true }];
 const STEPS: Array<[string, string, Technique]> = [
 	['m1-legacy', '+ drop legacy mode', LEGACY],
 	['m2-async', '+ drop async', ASYNC],
@@ -77,7 +77,7 @@ export const variants: Record<string, Variant> = {
 	baseline: {
 		description: 'Vanilla Svelte runtime + stock compiler options; only standard Bun.build DCE options.'
 	},
-	optimized: stack('Lossless build fixes: DEV const, barrel imports, PURE, no disclose-version, private-member DCE', ...OPTIMIZED)
+	optimized: stack('Lossless build fixes: DEV const, barrel imports, PURE, no disclose-version, dead-code post-pass', ...OPTIMIZED)
 };
 
 for (let i = 0; i < STEPS.length; i++) {
