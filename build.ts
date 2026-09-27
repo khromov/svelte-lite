@@ -242,6 +242,24 @@ export function verifyRemovedApi(variant: Variant, bundle: string, label: string
 }
 
 /**
+ * The Svelte checkout's own tsconfig.json maps `svelte/reactivity` to index-client.js, and Bun
+ * applies it to files inside the checkout (its real path is outside node_modules). So
+ * svelte/motion's `import { MediaQuery } from 'svelte/reactivity'` would pull the browser
+ * MediaQuery into the SSR bundle (`window is not defined`). Resolve the runtime's own bare
+ * `svelte/*` imports through the package exports instead, like any consumer's imports.
+ */
+const svelteSelfImports: import("bun").BunPlugin = {
+  name: "svelte-self-imports",
+  setup(build) {
+    build.onResolve({ filter: /^svelte(\/|$)/ }, ({ path, importer }) =>
+      importer.startsWith(SVELTE_DIR)
+        ? { path: Bun.resolveSync(path, ROOT) }
+        : undefined,
+    );
+  },
+};
+
+/**
  * SSR: bundle apps/<app>/server.js for Bun with the *unpatched* server runtime and the
  * variant's compiler options, render the app, and write index.html around the result.
  */
@@ -260,6 +278,7 @@ export async function buildHtml(name: string, variant: Variant, app: string) {
         generate: "server",
         compilerOptions: variant.compilerOptions,
       }),
+      svelteSelfImports,
     ],
     throw: false,
   });
@@ -306,7 +325,10 @@ export async function buildApp(name: string, variant: Variant, app: string) {
     `${name}/${app}`,
   );
   if (variant.postpass) {
-    const removed = await postpass(outdir);
+    const removed = await postpass(
+      outdir,
+      variant.postpass === true ? {} : variant.postpass,
+    );
     log.push(
       `post-pass: removed dead private members / statements: ${removed.join(", ") || "(none)"}`,
     );

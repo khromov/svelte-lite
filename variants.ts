@@ -11,11 +11,14 @@
  *              legacy mode, async, transitions/animations, root boundary, eager
  *              delegation, and the always-bundled $state proxy
  *   m1..m5     stacking steps between optimized and minimal (for COMPARISON.md)
+ *   baseline-bun  optimized + the post-pass's minify steps: Bun's closest lossless match
+ *              to Vite's baseline (VITE.md)
  */
 import type { BunPlugin } from 'bun';
 import type { CompileOptions } from 'svelte/compiler';
 import type { ConstImport, SourcePatch } from './plugins/patch.ts';
 import type { SveltePluginOptions } from './plugins/svelte.ts';
+import type { PostpassOptions } from './postpass.ts';
 import {
 	ASYNC,
 	DELEGATION,
@@ -24,7 +27,7 @@ import {
 	ROOT_BOUNDARY,
 	TRANSITIONS
 } from './patches/minimal.ts';
-import { DISCLOSE, DEV_CONST, NAMED_IMPORTS, PURE } from './patches/optimized.ts';
+import { DISCLOSE, DEV_CONST, MINIFY, NAMED_IMPORTS, PURE } from './patches/optimized.ts';
 import { SHORT_ERRORS, STRICT_HYDRATION } from './patches/flags.ts';
 
 export interface Variant {
@@ -40,8 +43,11 @@ export interface Variant {
 	constImports?: ConstImport[];
 	patches?: SourcePatch[];
 	plugins?: BunPlugin[];
-	/** Run the post-pass (postpass.ts): dead private members + provably dead statements. */
-	postpass?: boolean;
+	/**
+	 * Run the post-pass (postpass.ts): dead private members + provably dead statements; an
+	 * object also enables its opt-in minify steps (postpass-minify.ts).
+	 */
+	postpass?: boolean | PostpassOptions;
 }
 
 /** A named slice of a variant (patches + options) that serves one feature. */
@@ -78,7 +84,13 @@ export const variants: Record<string, Variant> = {
 	baseline: {
 		description: 'Vanilla Svelte runtime + stock compiler options; only standard Bun.build DCE options.'
 	},
-	optimized: stack('Lossless build fixes: DEV const, barrel imports, PURE, no disclose-version, dead-code post-pass', ...OPTIMIZED)
+	optimized: stack('Lossless build fixes: DEV const, barrel imports, PURE, no disclose-version, dead-code post-pass', ...OPTIMIZED),
+	// Bun's best lossless build, for comparing with Vite's baseline (VITE.md): not part of the stack
+	'baseline-bun': stack(
+		'optimized + minifier work Bun lacks (constant propagation, bit-flag tests): lossless, aims at Vite\'s baseline size',
+		...OPTIMIZED,
+		MINIFY
+	)
 };
 
 for (let i = 0; i < STEPS.length; i++) {

@@ -83,5 +83,13 @@ export const PURE: Technique = {
 	]
 };
 
+/**
+ * Minifier work Bun 1.4.2 doesn't do but Oxc (Vite 8) does, run by the post-pass on the bundle
+ * (postpass-minify.ts): never-written literal bindings inlined (e.g. `async_mode_flag`, effect
+ * flags), `(x & N) !== 0` tests shortened, constant comma-expression tests folded. No source is
+ * patched. Used by `baseline-bun` only for now.
+ */
+export const MINIFY: Technique = { postpass: { constants: true, flagTests: true, sequenceTests: true } };
+
 /** No `window.__svelte.v` version registration (compiler option; nothing functional). */
 export const DISCLOSE: Technique = { compilerOptions: { discloseVersion: false } };

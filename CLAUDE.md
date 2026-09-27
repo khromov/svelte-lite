@@ -50,6 +50,7 @@ bun run test:svelte --report         # regenerate SVELTE_TESTS.md from saved res
 | `optimized` | Lossless Bun fixes only |
 | `minimal` | `optimized` plus: no legacy mode, no async, no transitions/animations, no root boundary in `_mount`, lazy event delegation, `proxy()` only when used |
 | `m1-legacy` … `m5-delegation` | Cumulative steps between `optimized` and `minimal`, for the stacking table |
+| `baseline-bun` | `optimized` plus the post-pass's minify steps (`MINIFY`): Bun's closest lossless match to Vite's baseline (VITE.md). Not in the stack; `optimized`/`minimal` don't use these steps yet |
 
 **Build flags** (`patches/flags.ts`, `BUILD_FLAGS` in `variants.ts`) are opt-in techniques you can stack on any variant. A flagged build is its own variant, `<variant>+<flag>…`: it goes to `dist/<variant>+<flag>…/`, and names like `minimal+strict-hydration` also work in `check.ts` and `test:svelte`.
 
@@ -78,6 +79,7 @@ bun run test:svelte --report         # regenerate SVELTE_TESTS.md from saved res
 | `plugins/svelte.ts` | `.svelte` compile plugin, named imports, build-time bans |
 | `plugins/transform-compiled.js` | Compiled-output rewrite `$.set(x, v, true)` → `$.set(x, $.proxy(v))`; shared by the build and the test helper |
 | `postpass.ts` | Removes dead code Bun leaves in the output: unreferenced `#private` class members, constant-false branches and statements after `return`/`throw`. It repeats until nothing changes, then re-bundles |
+| `postpass-minify.ts` | Opt-in post-pass steps (`postpass: { constants, flagTests, sequenceTests }`) for minifier work Bun lacks and Oxc does: never-written literal bindings inlined, `(f & N) !== 0` → `f & N`, `if (a, !1)` folded. Each round ends in a syntax-only re-bundle so Bun folds what they expose |
 | `scripts/link-svelte.ts` | **The single source of truth** for Svelte's location: `SVELTE_DIR`, `SVELTE_REPO`, `SVELTE_INFO`. Never hard-code `../svelte` |
 | `scripts/vendor-svelte.ts` | Vendoring into `vendor/svelte/<ref>/` (one shallow clone per ref, pnpm install from the checkout's own lockfile) |
 | `harness.ts` | The behavioural test harness (SSR HTML → `hydrate()` → `apps/<app>/test.ts` in happy-dom). Runtime-neutral (`node:` APIs only), so Bun (`check.ts`) and Node run the same thing |
@@ -130,6 +132,7 @@ Most of the work here exists because Bun eliminates much less dead code than Rol
   - A module-level `const` only folds if it comes before every import and statement, and never in a module that has `export { x } from '…'`.
   - A function-local `const` only folds if it is the first statement in the function body; after a `var` it silently turns into a `let`.
   - A `let` never folds, which is why the flags `hydrating`, `legacy_mode_flag` and `async_mode_flag` need patches.
+  - A binding that is never written isn't treated as a constant either: `async_mode_flag` stays a variable even when its setter is tree-shaken. Oxc and Terser inline these. `postpass-minify.ts` does it for `baseline-bun`, but only for bindings no earlier-running code can reach, because Bun emits module-level `const` as `var`.
 - **Bun keeps dead code in two more cases:**
   - a constant-false block that declares a `var`. `if (!1) { var x; for (…) … }` is kept whole, loops and conditions included, although only the hoisted `var` names need to survive.
   - statements after a `return` or `throw`. This happens, for example, once a flag const turns a guard into an unconditional `return`, as in `Batch.apply()` when `async_mode_flag` is false.
@@ -145,6 +148,7 @@ Most of the work here exists because Bun eliminates much less dead code than Rol
   Use `/*@__PURE__*/` annotations or restructure the code.
 - **Top-level side effects pull in whole modules.** `custom-element.js` dragged in `svelte/legacy` and `hydrate()`. The fix is named imports from compiled components plus `optimizeImports: ['svelte']`.
 - **gzip already removes repeated strings.** Replacing a repeated prefix, e.g. the `https://svelte.dev/e/` in 61 messages, with a shared helper saves raw bytes but almost no gzip. Only removing *unique* content saves gzip. Always compare gzip, not just raw.
+- **Bun's minifier keeps statements as statements.** Unlike Oxc, it doesn't turn `if (a) b()` into `a && b()`, `if/else` into `?:`, or inline single-use locals. With the same input, Oxc is about 1 KB smaller on `hello`. Doing the `if` rewrites in a post-pass cut 1.5% raw but *added* 42–67 B gzip per app, because `if(` compresses better, so `baseline-bun` leaves them out (VITE.md).
 - **Minified names can shift** when eliminated code changes, giving the same raw bytes but a gzip size a few bytes different. Judge changes by raw size and a diff of `main.readable.js`, not gzip alone.
 - **Build-option limits:**
   - `feature()` from `bun:bundle` only works directly in an `if` or ternary.

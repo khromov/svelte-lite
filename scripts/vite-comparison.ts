@@ -13,7 +13,7 @@
  * The generated section starts with the Svelte source and bundler of each side, and warns if
  * the two sides were built from different Svelte sources.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { ROOT } from './link-svelte.ts';
 import { provenanceText, type Report } from '../measure.ts';
@@ -23,7 +23,13 @@ const flag = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=
 const SIDES = { Bun: resolve(flag('bun') ?? join(ROOT, 'dist')), Vite: resolve(flag('vite') ?? join(ROOT, 'dist-vite')) };
 type Side = keyof typeof SIDES;
 
-const APPS = ['hello', 'reactive', 'boundary', 'stores'];
+// every app in apps/, the two headline apps first
+const rank = (app: string) => ((i) => (i < 0 ? 2 : i))(['hello', 'reactive'].indexOf(app));
+const APPS = readdirSync(join(ROOT, 'apps'))
+	.filter((a) => existsSync(join(ROOT, 'apps', a, 'client.js')))
+	.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+	// ...that have been built on both sides
+	.filter((app) => Object.values(SIDES).every((dir) => existsSync(join(dir, 'baseline', app, 'report.json'))));
 const VARIANTS = ['baseline', 'optimized', 'minimal'];
 const n = (x: number) => x.toLocaleString('en-US');
 const signed = (x: number) => (x === 0 ? '0' : `${x > 0 ? '+' : '−'}${n(Math.abs(x))}`);
@@ -63,7 +69,29 @@ for (const app of APPS) {
 }
 md.push('');
 
-// 2. the stacking steps under each bundler
+// 2. Bun's best lossless build (baseline-bun) against Vite's plain baseline
+md.push('## Bun\'s closest lossless build: `baseline-bun` vs Vite\'s `baseline`', '');
+md.push(
+	'Every build in this table keeps all of Svelte\'s features. `baseline-bun` is `optimized` plus the post-pass\'s minify steps (postpass-minify.ts). Δ is `baseline-bun` minus Vite\'s `baseline`.',
+	''
+);
+md.push(
+	'| app | Vite baseline raw / gzip | Bun baseline | Bun optimized | Bun baseline-bun | Δ raw | Δ gzip | Δ brotli |',
+	'| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |'
+);
+for (const app of APPS) {
+	const vite = await size('Vite', 'baseline', app);
+	const cell = async (v: string) => {
+		const s = await size('Bun', v, app);
+		return s ? `${n(s.raw)} / ${n(s.gzip)}` : '–';
+	};
+	const best = await size('Bun', 'baseline-bun', app);
+	const d = (k: 'raw' | 'gzip' | 'brotli') => (best && vite ? `${signed(best[k] - vite[k])} (${pct(best[k], vite[k])})` : '–');
+	md.push(`| ${app} | ${vite ? `${n(vite.raw)} / ${n(vite.gzip)}` : '–'} | ${await cell('baseline')} | ${await cell('optimized')} | **${await cell('baseline-bun')}** | ${d('raw')} | ${d('gzip')} | ${d('brotli')} |`);
+}
+md.push('');
+
+// 3. the stacking steps under each bundler
 md.push('## Stacking under each bundler (gzip)', '');
 md.push('The variants of COMPARISON.md\'s stacking table, built by each bundler. Δ is the saving of that step over the row above, for that bundler.', '');
 md.push(
@@ -85,7 +113,7 @@ for (const v of STACK_ORDER) {
 }
 md.push('');
 
-// 3. where the two bundles differ, module by module
+// 4. where the two bundles differ, module by module
 md.push('## Where the bytes differ: per module (`min` bytes)', '');
 md.push(
 	'Bytes of `main.min.js` attributed to each source module (measure.ts, from the top-level statements of the aligned readable/minified builds), largest difference first. Modules within 50 B of each other are summed into the last row.',

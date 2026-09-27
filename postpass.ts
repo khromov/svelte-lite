@@ -19,7 +19,11 @@
  *    - constant-test expressions: `!1 && x`, `!0 || x`, `!1 ? a : b` (and their mirror images)
  *      keep only the part that can evaluate.
  *
- * Both steps repeat until nothing changes.
+ * 3. Opt-in (variant `postpass: { … }`): minifier work Bun doesn't do, see postpass-minify.ts
+ *    (constant propagation, bit-flag tests, dead comma-expression tests). With these, each
+ *    round of passes ends in a syntax-only re-bundle so Bun folds what they expose.
+ *
+ * All steps repeat until nothing changes.
  * Pipeline on dist/<variant>/<app>/:
  *   main.readable.js (Bun output, minify.syntax only: same DCE as main.min.js)
  *     -> delete unreferenced #private members and dead statements until fixpoint (acorn)
@@ -34,6 +38,7 @@
 import { join } from 'node:path';
 import { rmSync } from 'node:fs';
 import { SVELTE_DIR } from './scripts/link-svelte.ts';
+import { inlineConstants, removeDeadSequenceTests, simplifyFlagTests, type MinifyOptions } from './postpass-minify.ts';
 
 const acorn: any = await import(Bun.resolveSync('acorn', join(SVELTE_DIR, 'src')));
 
@@ -171,37 +176,58 @@ export function removeDeadStatements(src: string) {
 const MODULE_LINE = /^\/\/ (\S+\.(?:[cm]?js|ts|svelte))$/gm;
 const MODULE_LEGAL = /\/\*! @module (\S+) \*\//g;
 
+/** Opt-in steps on top of the dead-code removal (postpass-minify.ts). */
+export type PostpassOptions = MinifyOptions;
+
 /** Run the post-pass on one app output dir. Returns what was removed (empty = untouched). */
-export async function postpass(dir: string): Promise<string[]> {
+export async function postpass(dir: string, opts: PostpassOptions = {}): Promise<string[]> {
 	let readable = await Bun.file(join(dir, 'main.readable.js')).text();
 	const removed: string[] = [];
-	for (let pass = 1; ; pass++) {
-		if (pass > 50) throw new Error(`post-pass: no fixpoint after 50 passes in ${dir}`);
-		const members = removeDeadPrivate(readable);
-		const statements = removeDeadStatements(members.out);
-		if (!members.removed.length && !statements.removed.length) break;
-		removed.push(...members.removed, ...statements.removed);
-		readable = statements.out;
+	const steps = [
+		removeDeadPrivate,
+		removeDeadStatements,
+		...(opts.constants ? [inlineConstants] : []),
+		...(opts.flagTests ? [simplifyFlagTests] : []),
+		...(opts.sequenceTests ? [removeDeadSequenceTests] : [])
+	];
+	// The minify steps leave expressions for Bun to fold (`!!1`, `2 | 1024`, `if (!1)` with a
+	// `var`), so with them each round ends in a syntax-only re-bundle, until a round changes nothing.
+	for (let round = 1; ; round++) {
+		if (round > 20) throw new Error(`post-pass: no fixpoint after 20 rounds in ${dir}`);
+		const before = removed.length;
+		for (let pass = 1; ; pass++) {
+			if (pass > 50) throw new Error(`post-pass: no fixpoint after 50 passes in ${dir}`);
+			let changed = false;
+			for (const step of steps) {
+				const r = step(readable);
+				if (!r.removed.length) continue;
+				removed.push(...r.removed);
+				readable = r.out;
+				changed = true;
+			}
+			if (!changed) break;
+		}
+		if (steps.length === 2 || removed.length === before) break;
+		readable = await rebundle(dir, readable, { syntax: true });
 	}
 	if (!removed.length) return removed;
 
+	await Bun.write(join(dir, 'main.readable.js'), await rebundle(dir, readable, { syntax: true }));
+	await Bun.write(join(dir, 'main.min.js'), await rebundle(dir, readable, true));
+	return removed;
+}
+
+/** Re-bundle post-passed source with Bun, keeping the `// <module>` markers in readable output. */
+async function rebundle(dir: string, code: string, minify: { syntax: true } | true) {
 	const tmp = join(dir, '.postpass-input.js');
-	await Bun.write(tmp, readable.replace(MODULE_LINE, '/*! @module $1 */'));
+	await Bun.write(tmp, code.replace(MODULE_LINE, '/*! @module $1 */'));
 	try {
-		for (const [file, minify] of [
-			['main.readable.js', { syntax: true }],
-			['main.min.js', true]
-		] as const) {
-			const r = await Bun.build({ entrypoints: [tmp], minify, target: 'browser', format: 'esm' });
-			if (!r.success) throw new AggregateError(r.logs, 'post-pass re-bundle failed');
-			let text = await r.outputs[0].text();
-			text = file === 'main.min.js' ? text.replace(MODULE_LEGAL, '') : text.replace(MODULE_LEGAL, '// $1');
-			// Bun prefixes the entry's own path comment; drop it
-			text = text.replace(/^\/\/ \.postpass-input\.js\n/m, '');
-			await Bun.write(join(dir, file), text);
-		}
+		const r = await Bun.build({ entrypoints: [tmp], minify, target: 'browser', format: 'esm' });
+		if (!r.success) throw new AggregateError(r.logs, 'post-pass re-bundle failed');
+		const text = await r.outputs[0].text();
+		// Bun prefixes the entry's own path comment; drop it
+		return (minify === true ? text.replace(MODULE_LEGAL, '') : text.replace(MODULE_LEGAL, '// $1')).replace(/^\/\/ \.postpass-input\.js\n/m, '');
 	} finally {
 		rmSync(tmp, { force: true });
 	}
-	return removed;
 }
