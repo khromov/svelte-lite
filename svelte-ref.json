@@ -1,0 +1,8 @@
+{
+	"repo": "https://github.com/sveltejs/svelte.git",
+	"ref": "5.57.1",
+	"tag": "svelte@5.57.1",
+	"sha": "636eaaaa6f064b55072e7d192bb76dc9d8c4516e",
+	"version": "5.57.1",
+	"path": "vendor/svelte/5.57.1"
+}

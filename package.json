@@ -1,0 +1,29 @@
+{
+	"name": "svelte-lite",
+	"private": true,
+	"type": "module",
+	"description": "Bun.build() scaffold for measuring and slimming the Svelte 5 client runtime",
+	"scripts": {
+		"setup": "bun scripts/link-svelte.ts",
+		"vendor": "bun scripts/vendor-svelte.ts",
+		"anchors": "bun run check.ts --anchors",
+		"build": "bun run build.ts",
+		"build:all": "bun run build.ts --all",
+		"measure": "bun run measure.ts",
+		"compare": "bun run measure.ts --compare baseline optimized minimal",
+		"check": "bun run check.ts",
+		"serve": "bun run serve.ts",
+		"typecheck": "bun node_modules/svelte/node_modules/typescript/bin/tsc -p .",
+		"postinstall": "bun scripts/link-svelte.ts",
+		"coverage": "bun scripts/coverage.ts",
+		"negative": "bun scripts/negative.ts",
+		"patches": "bun scripts/patches-doc.ts",
+		"comparison": "bun scripts/comparison.ts",
+		"test:svelte": "bun scripts/svelte-tests.ts"
+	},
+	"devDependencies": {
+		"@happy-dom/global-registrator": "20.14.5",
+		"@types/bun": "1.4.2",
+		"happy-dom": "20.14.5"
+	}
+}

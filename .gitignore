@@ -1,0 +1,13 @@
+# vendored Svelte checkouts (bun run vendor <ref>); the active one is pinned in svelte-ref.json
+vendor/
+
+# scratch: verification builds, Svelte test-suite copies
+.cache/
+
+# build output (bun run build.ts); regenerable, and large (metafiles, coverage)
+dist/
+
+node_modules/
+
+*.log
+.DS_Store
