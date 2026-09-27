@@ -60,8 +60,26 @@ export function transformCompiled(code: string, file: string, opts: SveltePlugin
 	return sharedTransform(code, file, opts, { acorn, MagicString });
 }
 
-export function sveltePlugin(opts: SveltePluginOptions = {}): BunPlugin {
+/**
+ * Compile a component (`*.svelte`) or rune module (`*.svelte.js|ts`) with the variant's options
+ * and post-process client output. Shared by the Bun plugin below and plugins/vite.ts, so both
+ * bundlers get the same compiled input. `css` is the component CSS (client only); the caller
+ * imports it as a virtual module.
+ */
+export function compileSvelte(path: string, source: string, opts: SveltePluginOptions): { code: string; css: string | null } {
 	const generate = opts.generate ?? 'client';
+	const component = path.endsWith('.svelte');
+	if (!component && path.endsWith('.ts')) source = ts.transformSync(source);
+	const result = component
+		? compile(source, { filename: path, generate, dev: false, css: 'external', ...opts.compilerOptions })
+		: compileModule(source, { filename: path, generate, dev: false, ...opts.moduleCompilerOptions });
+	for (const w of result.warnings) console.warn(`[svelte] ${w.filename}: ${w.message}`);
+	if (generate !== 'client') return { code: result.js.code, css: null };
+	const css = component ? ((result as ReturnType<typeof compile>).css?.code ?? null) : null;
+	return { code: transformCompiled(result.js.code, path, opts), css: css || null };
+}
+
+export function sveltePlugin(opts: SveltePluginOptions = {}): BunPlugin {
 	return {
 		name: 'svelte',
 		setup(build) {
@@ -69,21 +87,10 @@ export function sveltePlugin(opts: SveltePluginOptions = {}): BunPlugin {
 
 			// Components
 			build.onLoad({ filter: /\.svelte$/ }, async ({ path }) => {
-				const source = await Bun.file(path).text();
-				const result = compile(source, {
-					filename: path,
-					generate,
-					dev: false,
-					css: 'external',
-					...opts.compilerOptions
-				});
-				for (const w of result.warnings) console.warn(`[svelte] ${w.filename}: ${w.message}`);
-
-				let code = result.js.code;
-				if (generate === 'client') code = transformCompiled(code, path, opts);
-				if (result.css?.code && generate === 'client') {
+				let { code, css: style } = compileSvelte(path, await Bun.file(path).text(), opts);
+				if (style) {
 					const id = `${path}.css`;
-					css.set(id, result.css.code);
+					css.set(id, style);
 					code += `\nimport ${JSON.stringify(id)};`;
 				}
 				opts.onCompiled?.(path, code);
@@ -92,16 +99,7 @@ export function sveltePlugin(opts: SveltePluginOptions = {}): BunPlugin {
 
 			// Rune-enabled modules: foo.svelte.js / foo.svelte.ts
 			build.onLoad({ filter: /\.svelte\.(js|ts)$/ }, async ({ path }) => {
-				let source = await Bun.file(path).text();
-				if (path.endsWith('.ts')) source = ts.transformSync(source);
-				const result = compileModule(source, {
-					filename: path,
-					generate,
-					dev: false,
-					...opts.moduleCompilerOptions
-				});
-				for (const w of result.warnings) console.warn(`[svelte] ${w.filename}: ${w.message}`);
-				const code = generate === 'client' ? transformCompiled(result.js.code, path, opts) : result.js.code;
+				const { code } = compileSvelte(path, await Bun.file(path).text(), opts);
 				opts.onCompiled?.(path, code);
 				return { contents: code, loader: 'js' };
 			});

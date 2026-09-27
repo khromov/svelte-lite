@@ -9,6 +9,7 @@
 		"anchors": "bun run check.ts --anchors",
 		"build": "bun run build.ts",
 		"build:all": "bun run build.ts --all",
+		"build:vite": "bun run build-vite.ts",
 		"measure": "bun run measure.ts",
 		"compare": "bun run measure.ts --compare baseline optimized minimal",
 		"check": "bun run check.ts",
@@ -20,11 +21,13 @@
 		"negative": "bun scripts/negative.ts",
 		"patches": "bun scripts/patches-doc.ts",
 		"comparison": "bun scripts/comparison.ts",
+		"comparison:vite": "bun scripts/vite-comparison.ts",
 		"test:svelte": "bun scripts/svelte-tests.ts"
 	},
 	"devDependencies": {
 		"@happy-dom/global-registrator": "20.14.5",
 		"@types/bun": "1.4.2",
-		"happy-dom": "20.14.5"
+		"happy-dom": "20.14.5",
+		"vite": "8.3.1"
 	}
 }

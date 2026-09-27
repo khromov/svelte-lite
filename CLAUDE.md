@@ -30,6 +30,7 @@ bun run anchors [--svelte=<ref>]     # do all patch anchors apply to that ref? (
 bun run build.ts <variant> [--app=reactive] [--no-coverage] [--svelte=<ref>] [--out=<dir>]
 bun run build.ts minimal --strict-hydration --short-errors   # build flags -> dist/minimal+strict-hydration+short-errors/
 bun run build.ts --all               # every variant x app; about 15 min (coverage and compression dominate)
+bun run build-vite.ts <variant> [--all] [--app=x] [--svelte=<ref>]   # same variants bundled by Vite -> dist-vite/
 bun run check.ts [variant]           # happy-dom check + patch anchors + negative tests
 bun run test:svelte <variant> [--suite=runtime-runes] [--filter=<sample>] [--without=PROXY] [--async=on|off] [--fresh]
 bun run compare                      # size table: baseline vs optimized vs minimal
@@ -37,6 +38,7 @@ bun run coverage:bytes [variant] [--app=x]   # V8 block coverage -> COVERAGE.md 
 
 bun run patches                      # regenerate PATCHES.md
 bun run comparison                   # regenerate COMPARISON.md (needs coverage.json: build without --no-coverage)
+bun run comparison:vite              # regenerate VITE.md: Bun (dist/) vs Vite (dist-vite/), same Svelte ref on both sides
 bun run test:svelte --report         # regenerate SVELTE_TESTS.md from saved results
 ```
 
@@ -70,6 +72,7 @@ bun run test:svelte --report         # regenerate SVELTE_TESTS.md from saved res
 | Path | What it is |
 |---|---|
 | `build.ts`, `variants.ts` | Build driver; variants are composed from techniques |
+| `build-vite.ts`, `plugins/vite.ts` | The same variants bundled by Vite 8 (Rolldown + Oxc). The Vite plugins call the same `loadPatched()` and `compileSvelte()` as the Bun plugins, so only the bundler differs. `optimizeImports` and `postpass` are Bun-only and skipped |
 | `patches/optimized.ts`, `patches/minimal.ts`, `patches/flags.ts` | Patch definitions, grouped by technique (`LEGACY`, `ASYNC`, `TRANSITIONS`, `ROOT_BOUNDARY`, `DELEGATION`, `PROXY`, …; build flags `STRICT_HYDRATION`, `SHORT_ERRORS`) |
 | `plugins/patch.ts` | Patch engine: `replace`, `removeMembers`, `removeFunctions`, `replaceFunctions`, `prepend`, `contents`, `constImports` |
 | `plugins/svelte.ts` | `.svelte` compile plugin, named imports, build-time bans |
@@ -81,6 +84,7 @@ bun run test:svelte --report         # regenerate SVELTE_TESTS.md from saved res
 | `scripts/byte-coverage.ts`, `scripts/v8-coverage.ts` | Byte-level coverage: runs the harness under Node with V8 block coverage, attributes never-executed bytes of `main.min.js` to functions, scans for provably dead code, writes `COVERAGE.md` and `dist/<variant>/<app>/coverage.readable.txt` (per-line gutter). `scripts/coverage.ts` is the older function-level view, which overstates usage |
 | `scripts/svelte-tests.ts` | Runs Svelte's official Vitest suites on disposable patched copies in `.cache/svelte-test/` and diffs against unpatched Svelte |
 | `dist/<variant>/<app>/` | Build output. `main.min.js` is the measured number; read `main.readable.js` (same dead-code elimination, readable names, module markers) |
+| `dist-vite/<variant>/<app>/` | The same layout from `build-vite.ts`. `check.ts --out=dist-vite` re-checks it |
 
 **Docs:**
 
@@ -89,6 +93,7 @@ bun run test:svelte --report         # regenerate SVELTE_TESTS.md from saved res
 | `FEATURE_REPORT.md` | Feature and LOC map of the runtime. Its byte figures are from Rollup/esbuild; see its Bun addendum |
 | `BASELINE.md` | Bun options and baseline analysis |
 | `COMPARISON.md` | Sizes and stacking table |
+| `VITE.md` | Bun vs Vite on the same variants: sizes, stacking, per-module differences. Generated, except the hand-written setup above the marker |
 | `PATCHES.md` | Every patch, generated |
 | `SVELTE_TESTS.md` | Results of Svelte's own test suite |
 | `COVERAGE.md` | How much of each shipped bundle executes, and the provably dead bytes. Generated, except the hand-written notes block |
@@ -149,7 +154,7 @@ Most of the work here exists because Bun eliminates much less dead code than Rol
 
 ## Pitfalls
 
-- **Don't build against two Svelte refs at once in this directory.** Builds re-point the shared `node_modules/svelte` symlink and would race; use `--out` plus an isolated copy of the project instead.
+- **Don't build against two Svelte refs at once in this directory.** Builds re-point the shared `node_modules/svelte` symlink and would race; use `--out` plus an isolated copy of the project instead. This includes `build-vite.ts` next to a running `build.ts`: give both the same `SVELTE_REF`/`--svelte=`.
 - **Never run Vitest inside `vendor/svelte/<ref>`.** It writes `_actual*` files that aren't gitignored, and then the dirty-checkout guard blocks every build. Use `bun run test:svelte`.
 - **Read the stacking table with care.** Savings in `COMPARISON.md` depend on step order: a step gets credit for everything that becomes unreachable when it lands. For example, the async step removes `set()` and `proxy()` from `hello`.
 - **When iterating,** pass `--no-coverage` and a single variant or `--app=`. Do a full build before regenerating `COMPARISON.md`.

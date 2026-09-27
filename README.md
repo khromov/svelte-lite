@@ -24,6 +24,7 @@ bun run build.ts minimal       # also: baseline, optimized, --all
 bun run build.ts minimal --strict-hydration --short-errors   # opt-in build flags
 bun run check.ts               # behavioural checks, patch anchors, negative tests
 bun run test:svelte minimal    # Svelte's own test suite against the patched runtime
+bun run build-vite.ts minimal  # the same variant bundled by Vite instead -> dist-vite/ (see VITE.md)
 ```
 
 `minimal` currently needs `--svelte=main`. See the "Known state" section in [CLAUDE.md](CLAUDE.md).
@@ -33,6 +34,7 @@ bun run test:svelte minimal    # Svelte's own test suite against the patched run
 | File | Contents |
 | --- | --- |
 | [COMPARISON.md](COMPARISON.md) | Sizes, and savings per feature |
+| [VITE.md](VITE.md) | The same variants bundled by Bun and by Vite, side by side |
 | [PATCHES.md](PATCHES.md) | Every patch and why it exists |
 | [SVELTE_TESTS.md](SVELTE_TESTS.md) | Results of Svelte's official test suite |
 | [COVERAGE.md](COVERAGE.md) | How much of each bundle actually executes, and what never runs |

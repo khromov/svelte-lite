@@ -202,6 +202,8 @@ export interface Report {
 	/** exact Svelte source the bundle was built from (see scripts/link-svelte.ts) */
 	svelte: Pick<SvelteInfo, 'repo' | 'ref' | 'tag' | 'sha' | 'version' | 'dirty'>;
 	bunVersion: string;
+	/** what bundled it: "Bun 1.4.2" (build.ts) or "Vite 8.3.1 (Rolldown …)" (build-vite.ts); absent in older reports = Bun */
+	bundler?: string;
 	sizes: Record<string, { raw: number; gzip: number; brotli: number }>;
 	modules: Array<{
 		module: string;
@@ -237,7 +239,7 @@ function metaInputs(outdir: string, mode: string): Record<string, number> {
 	return out;
 }
 
-export async function measure(variant: string, app: string, outdir = join(DIST, variant, app), { print = false } = {}) {
+export async function measure(variant: string, app: string, outdir = join(DIST, variant, app), { print = false, bundler = `Bun ${Bun.version}` } = {}) {
 	const sizes: Report['sizes'] = {};
 	for (const f of readdirSync(outdir).sort()) {
 		if (!/^main.*\.(js|css)$/.test(f)) continue;
@@ -318,6 +320,7 @@ export async function measure(variant: string, app: string, outdir = join(DIST, 
 		svelteVersion: (await Bun.file(join(SVELTE_DIR, 'package.json')).json()).version,
 		svelte: svelteProvenance(),
 		bunVersion: Bun.version,
+		bundler,
 		sizes,
 		modules,
 		categories,
@@ -384,7 +387,7 @@ export function renderMarkdown(r: Report) {
 	const out = [
 		`# ${r.variant} / ${r.app}`,
 		'',
-		`Svelte ${r.svelteVersion}${r.svelte ? ` (${provenanceText(r.svelte)})` : ''}, Bun ${r.bunVersion}`,
+		`Svelte ${r.svelteVersion}${r.svelte ? ` (${provenanceText(r.svelte)})` : ''}, ${r.bundler ?? `Bun ${r.bunVersion}`}`,
 		'',
 		'## Sizes',
 		'',

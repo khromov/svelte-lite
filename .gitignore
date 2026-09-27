@@ -4,8 +4,9 @@ vendor/
 # scratch: verification builds, Svelte test-suite copies
 .cache/
 
-# build output (bun run build.ts); regenerable, and large (metafiles, coverage)
+# build output (bun run build.ts / build-vite.ts); regenerable, and large (metafiles, coverage)
 dist/
+dist-vite/
 
 node_modules/
 

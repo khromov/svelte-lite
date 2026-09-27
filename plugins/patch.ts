@@ -97,25 +97,38 @@ async function getAcorn(svelteDir: string) {
 
 const IMPORT_RE = /import\s*\{([^}]*)\}\s*from\s*(['"])([^'"]+)\2\s*;?/g;
 
+/** Real path of every runtime module the patches may touch (`<svelte>/src/**.js`). */
+export function runtimeFilter(svelteDir: string): RegExp {
+	const escaped = resolve(realpathSync(svelteDir), 'src').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return new RegExp(`^${escaped}/.*\\.js$`);
+}
+
+/**
+ * Load one runtime module with its patches applied, for a bundler's load hook (shared by
+ * patchPlugin and plugins/vite.ts). Returns undefined if no patch changed it.
+ */
+export async function loadPatched(path: string, opts: PatchPluginOptions): Promise<string | undefined> {
+	const original = await Bun.file(path).text();
+	const { code, applied } = await applyPatches(path, original, opts);
+	if (code === original) return undefined;
+	for (const a of applied) opts.log?.push(`${a.file}: [${a.feature}] ${a.why}`);
+	// Debug aid: SVELTE_LITE_DUMP=/some/dir writes every patched module there.
+	if (process.env.SVELTE_LITE_DUMP) {
+		await Bun.write(resolve(process.env.SVELTE_LITE_DUMP, relative(realpathSync(opts.svelteDir), path)), code);
+	}
+	return code;
+}
+
 export function patchPlugin(opts: PatchPluginOptions): BunPlugin {
-	const svelteDir = realpathSync(opts.svelteDir);
-	const srcDir = resolve(svelteDir, 'src');
-	const escaped = srcDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	const filter = new RegExp(`^${escaped}/.*\\.js$`);
+	const filter = runtimeFilter(opts.svelteDir);
 
 	return {
 		name: 'svelte-lite-patch',
 		setup(build) {
 			if (!opts.patches?.length && !opts.constImports?.length) return;
 			build.onLoad({ filter }, async ({ path }) => {
-				const original = await Bun.file(path).text();
-				const { code, applied } = await applyPatches(path, original, opts);
-				if (code === original) return undefined; // untouched: let Bun load it normally
-				for (const a of applied) opts.log?.push(`${a.file}: [${a.feature}] ${a.why}`);
-				// Debug aid: SVELTE_LITE_DUMP=/some/dir writes every patched module there.
-				if (process.env.SVELTE_LITE_DUMP) {
-					await Bun.write(resolve(process.env.SVELTE_LITE_DUMP, relative(svelteDir, path)), code);
-				}
+				const code = await loadPatched(path, opts);
+				if (code === undefined) return undefined; // untouched: let Bun load it normally
 				return { contents: code, loader: 'js' };
 			});
 		}

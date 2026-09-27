@@ -198,7 +198,7 @@ export async function buildClient(
 }
 
 /** Fail loudly if Svelte or esm-env resolved to a dev/server/fallback file. */
-function verifyResolution(
+export function verifyResolution(
   meta: {
     inputs: Record<string, { imports: { path: string; original?: string }[] }>;
   },
@@ -227,7 +227,7 @@ function verifyResolution(
  * the bundle still contains a call to one. (Removed #private members can't be referenced
  * at all: that is already a parse error.)
  */
-function verifyRemovedApi(variant: Variant, bundle: string, label: string) {
+export function verifyRemovedApi(variant: Variant, bundle: string, label: string) {
   for (const p of variant.patches ?? []) {
     for (const m of p.removeMembers?.members ?? []) {
       if (m.startsWith("#")) continue;
@@ -270,11 +270,19 @@ export async function buildHtml(name: string, variant: Variant, app: string) {
   const mod = await import(`${result.outputs[0].path}?v=${Date.now()}`);
   const { head, body } = mod.render(mod.App);
   rmSync(ssrDir, { recursive: true, force: true });
-  const html = `<!doctype html>
+  await Bun.write(
+    join(outdir, "index.html"),
+    htmlPage(`svelte-lite: ${app} (${name})`, head, body),
+  );
+}
+
+/** index.html around an SSR render() result; the client bundle is ./main.min.js. */
+export const htmlPage = (title: string, head: string, body: string) =>
+  `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>svelte-lite: ${app} (${name})</title>
+<title>${title}</title>
 ${head}
 </head>
 <body>
@@ -283,8 +291,6 @@ ${head}
 </body>
 </html>
 `;
-  await Bun.write(join(outdir, "index.html"), html);
-}
 
 export async function buildApp(name: string, variant: Variant, app: string) {
   const outdir = outDir(name, app);
