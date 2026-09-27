@@ -16,6 +16,8 @@
  *      `async_mode_flag` folds its guard to an unconditional `return`. Hoisted `var` names and
  *      function declarations are kept; a site whose dead tail declares `let`/`const`/`class`
  *      is left alone (removing those could change what a name resolves to).
+ *    - constant-test expressions: `!1 && x`, `!0 || x`, `!1 ? a : b` (and their mirror images)
+ *      keep only the part that can evaluate.
  *
  * Both steps repeat until nothing changes.
  * Pipeline on dist/<variant>/<app>/:
@@ -122,6 +124,19 @@ export function removeDeadStatements(src: string) {
 			const liveSrc = live ? src.slice(live.start, live.end) : '';
 			cuts.push([n.start, n.end, keep && liveSrc ? `{${keep}${liveSrc}}` : keep || liveSrc || ';', `if (${FALSE(n.test) ? 'false' : 'true'})`]);
 			return; // the live branch is revisited on the next pass
+		}
+		// expressions: `!1 && x` -> `!1`, `!0 || x` -> `!0` (x never evaluates); `!1 || x`, `!0 && x` -> `x`;
+		// `!1 ? a : b` -> `b`. Parenthesised, so the replacement is valid wherever the expression was.
+		if (n.type === 'LogicalExpression' && (n.operator === '&&' || n.operator === '||') && (FALSE(n.left) || TRUE(n.left))) {
+			const shortCircuit = n.operator === '&&' ? FALSE(n.left) : TRUE(n.left);
+			const keep = shortCircuit ? n.left : n.right;
+			cuts.push([n.start, n.end, `(${src.slice(keep.start, keep.end)})`, `${src.slice(n.left.start, n.left.end)} ${n.operator}`]);
+			return;
+		}
+		if (n.type === 'ConditionalExpression' && (FALSE(n.test) || TRUE(n.test))) {
+			const keep = FALSE(n.test) ? n.alternate : n.consequent;
+			cuts.push([n.start, n.end, `(${src.slice(keep.start, keep.end)})`, `${FALSE(n.test) ? 'false' : 'true'} ? :`]);
+			return;
 		}
 		const body = n.type === 'BlockStatement' || n.type === 'StaticBlock' ? n.body : n.type === 'SwitchCase' ? n.consequent : null;
 		if (body) {

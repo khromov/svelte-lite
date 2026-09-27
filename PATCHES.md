@@ -53,12 +53,15 @@ Generated against Svelte 5.57.1: `main` @ `f90853565966bc0bab57c99fe7d669a91bef0
 | minimal: ROOT_BOUNDARY | minimal | 1 | 1 | 12 | 6 |
 | minimal: DELEGATION | minimal | 2 | 2 | 59 | 58 |
 | minimal: PROXY | minimal | 2 | 2 | 4 | 4 |
+| flag: STRICT_HYDRATION | build flag | 1 | 1 | 22 | 3 |
+| flag: SHORT_ERRORS | build flag | 4 | 4 | 61 | 73 |
 | constImports (dev) (DEV, BROWSER, NODE) | optimized | 1 | 43 | 65 | 93 |
 | constImports (legacy) (legacy_mode_flag) | minimal | 1 | 4 | 16 | 14 |
 | constImports (async) (async_mode_flag) | minimal | 1 | 9 | 19 | 19 |
 
 - **optimized**: 6 patches, 49 files, −111 / +122 lines (plus the compiled-output transforms and options listed above).
 - **minimal** (includes optimized): 28 patches, 51 files, −1239 / +299 lines.
+- **build flags** (opt-in, `--strict-hydration` / `--short-errors` on top of any variant): 5 patches, 5 files, −83 / +76 lines.
 
 ## Every source patch
 
@@ -69,15 +72,20 @@ Lines are counted with `diff` against the file as it was before that patch (patc
 | optimized | PURE | `constants.js` | 1 text edit | −3 / +3 | mark top-level `Symbol(...)` initialisers /*@__PURE__*/ so unused ones tree-shake |
 | minimal | LEGACY | `internal/flags/index.js` | 2 text edits | −4 / +2 | legacy_mode_flag is a constant; enabling legacy mode throws |
 | minimal | ASYNC | `internal/flags/index.js` | 3 text edits | −7 / +3 | async_mode_flag is a constant; enabling async mode throws |
+| flag | SHORT_ERRORS | `internal/shared/warnings.js` | 2 text edits | −2 / +7 | define svelte_lite_warn(code); production warnings call it with just their code |
 | optimized | PURE | `internal/shared/attributes.js` | 1 text edit | −1 / +1 | wrap the `whitespace` string spread in a pure IIFE |
+| flag | SHORT_ERRORS | `internal/shared/errors.js` | 2 text edits | −10 / +15 | define svelte_lite_error(code); production errors call it with just their code |
 | optimized | PURE | `internal/client/constants.js` | 1 text edit | −11 / +11 | mark top-level `Symbol(...)` initialisers /*@__PURE__*/ so unused ones tree-shake |
 | optimized | PURE | `internal/client/constants.js` | 1 text edit | −4 / +1 | IS_XHTML reads globalThis.document at module init; wrap in a pure IIFE |
+| flag | SHORT_ERRORS | `internal/client/warnings.js` | 2 text edits | −20 / +21 | production warnings call the shared svelte_lite_warn(code) |
 | optimized | DEV_CONST | `internal/client/proxy.js` | remove fn update_path | −14 / +0 | dev-only nested update_path() (its only use is `if (DEV && ...) return update_path`); Bun never removes unused nested functions, and it keeps tag()/get_label() alive |
 | minimal | PROXY | `internal/client/proxy.js` | 1 text edit | −1 / +1 | the one runtime-internal `set(s, v, true)` call (defineProperty trap) proxies explicitly |
 | minimal | ASYNC | `internal/client/runtime.js` | replace fn settled (hash-pinned) | −3 / +1 | settled() waits for async work; stub |
 | minimal | TRANSITIONS | `internal/client/render.js` | 2 text edits | −2 / +0 | should_intro only gates intro transitions |
 | minimal | ROOT_BOUNDARY | `internal/client/render.js` | 5 text edits | −12 / +6 | _mount renders the component in a plain branch instead of a root Boundary (loses the `transformError` option and root-level pending/failed handling). The SSR root is `<!--[-->app<!--]-->` with no boundary-specific marker: the Boundary only consumed the opening `<!--[-->`, so _mount now does that itself (hydrate_next()); the closing marker check is unchanged |
 | minimal | DELEGATION | `internal/client/render.js` | 5 text edits | −59 / +5 | _mount keeps its per-root registration hook but delegates listener management to events.js `delegation` (null until a component calls delegate()) |
+| flag | STRICT_HYDRATION | `internal/client/render.js` | 1 text edit | −22 / +3 | hydrate(): a mismatch throws hydration_failed instead of clearing the target and mounting on the client (as `recover: false`, but the recovery code no longer ships) |
+| flag | SHORT_ERRORS | `internal/client/errors.js` | 2 text edits | −29 / +30 | production errors call the shared svelte_lite_error(code) |
 | minimal | LEGACY | `internal/client/reactivity/batch.js` | 5 text edits | −13 / +6 | drop `legacy_updates` (set() during traversal is deferred to a new batch only for legacy `$:`/stores); writes during traversal are scheduled on the current batch like internal_set() |
 | minimal | ASYNC | `internal/client/reactivity/batch.js` | 14 text edits; remove 27 Batch members; replace fn fork (hash-pinned) | −546 / +16 | strip the async/fork-only members of Batch and their call sites in #process/#traverse/discard/schedule/capture (sync batches never defer, fork or rebase) |
 | minimal | ASYNC | `internal/client/reactivity/effects.js` | 1 text edit | −1 / +1 | effects are only registered with the batch for fork rebasing |

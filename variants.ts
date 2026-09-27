@@ -25,6 +25,7 @@ import {
 	TRANSITIONS
 } from './patches/minimal.ts';
 import { DISCLOSE, DEV_CONST, NAMED_IMPORTS, PURE } from './patches/optimized.ts';
+import { SHORT_ERRORS, STRICT_HYDRATION } from './patches/flags.ts';
 
 export interface Variant {
 	description: string;
@@ -90,5 +91,38 @@ for (let i = 0; i < STEPS.length; i++) {
 	void what;
 }
 
+/**
+ * Build flags: opt-in techniques stacked on top of any variant
+ * (`bun run build.ts minimal --strict-hydration --short-errors`). A flagged build is its own
+ * variant named `<variant>+<flag>…` (flags in this order), built into dist/<that name>/.
+ */
+export const BUILD_FLAGS: Record<string, Technique> = {
+	'strict-hydration': STRICT_HYDRATION,
+	'short-errors': SHORT_ERRORS
+};
+
+/** Resolve a variant name, including flagged names like `minimal+strict-hydration`. */
+export function resolveVariant(name: string): Variant | undefined {
+	const [base, ...flags] = name.split('+');
+	const variant = variants[base];
+	if (!variant || flags.some((f) => !BUILD_FLAGS[f])) return undefined;
+	if (!flags.length) return variant;
+	return {
+		...stack('', variant as Technique, ...flags.map((f) => BUILD_FLAGS[f])),
+		description: `${variant.description} + ${flags.map((f) => `--${f}`).join(' ')}`
+	};
+}
+
+/** `<variant>+<flag>…` with the flags in canonical (BUILD_FLAGS) order. */
+export const flaggedName = (base: string, flags: string[]) =>
+	[base, ...Object.keys(BUILD_FLAGS).filter((f) => flags.includes(f))].join('+');
+
 /** Variant names in stacking order (for COMPARISON.md). */
-export const STACK_ORDER = ['baseline', 'optimized', ...STEPS.map((s) => s[0])];
+export const STACK_ORDER = [
+	'baseline',
+	'optimized',
+	...STEPS.map((s) => s[0]),
+	// build flags, one at a time on top of minimal
+	'minimal+strict-hydration',
+	'minimal+strict-hydration+short-errors'
+];

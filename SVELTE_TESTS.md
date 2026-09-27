@@ -455,6 +455,315 @@ Per suite: runtime-runes 2
 
 </details>
 
+## `minimal+strict-hydration+short-errors` (async mode off)
+
+Svelte `f90853565966bc0bab57c99fe7d669a91bef0f4c` · async mode **off** (SVELTE_NO_ASYNC=true, as in the official TestNoAsync CI job) · 62s · techniques not applied: DEV_CONST (dev-mode tests need DEV from esm-env; runtime-production mocks DEV=false)
+
+| suite | reference pass / fail / skip | variant pass / fail / skip | unexpected | expected |
+| --- | ---: | ---: | ---: | ---: |
+| runtime-runes | 1826 / 0 / 9 | 1761 / 65 / 9 | 0 | 65 |
+| runtime-legacy | 3301 / 1 / 10 | 0 / 3302 / 10 | 0 | 3301 |
+| runtime-production | 11 / 0 / 0 | 11 / 0 / 0 | 0 | 0 |
+| runtime-xhtml | 24 / 0 / 0 | 24 / 0 / 0 | 0 | 0 |
+| hydration | 84 / 0 / 0 | 19 / 65 / 0 | 0 | 65 |
+| signals | 104 / 1 / 2 | 104 / 1 / 2 | 0 | 1 |
+| store | 33 / 0 / 0 | 33 / 0 / 0 | 0 | 0 |
+| motion | 8 / 0 / 0 | 8 / 0 / 0 | 0 | 0 |
+| runtime-browser | 102 / 0 / 0 | 26 / 76 / 0 | 0 | 76 |
+| unit | 141 / 0 / 0 | 109 / 0 / 32 | 0 | 32 |
+
+### Unexpected regressions (0)
+
+None.
+
+### Expected failures, by dropped feature (3540)
+
+<details><summary><b>legacy</b>: 3234 test(s)</summary>
+
+Detected by: hit the svelte-lite stub for legacy mode (Svelte 4 syntax) (3202); compiled output enables legacy mode (non-runes component) (3234); compiled output uses legacy runtime helpers (1298); runtime-legacy suite: non-runes components (createClassComponent, legacy mode) (3076); sample opts out of runes (17)
+
+Per suite: hydration 64, runtime-browser 76, runtime-legacy 3076, runtime-runes 18
+
+- `hydration/test.ts :: basic`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: binding-input`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: boundary-mismatch-recovery`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: claim-comment`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: claim-static`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: claim-text`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: cloudflare-mirage-borking`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: cloudflare-mirage-borking-2`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: component`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: component-in-element`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: css-props-hmr`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: custom-element-with-settable-only-property`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `hydration/test.ts :: dynamic-element-child-mismatch`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: dynamic-text`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: dynamic-text-changed`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: dynamic-text-nil`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: each-block`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: each-block-arg-clash`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `hydration/test.ts :: each-else`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: each-preserve-whitespace`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: each-text-only`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: element-attribute-added`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: element-attribute-changed`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: element-attribute-removed`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: element-attribute-unchanged`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: element-dir-attribute-sibling`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: element-nested`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: element-nested-sibling`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: element-ref`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: event-handler`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: expression-sibling`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: head-css-no-class`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: head-html-and-component`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: head-meta-hydrate-duplicate`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: head-missing`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: html-tag-hydration`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: if-block`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: if-block-anchor`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: if-block-empty`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: if-block-false`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: if-block-update`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: input-checked-attribute-sibling`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: no-reset-debug`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: no-reset-snippet`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: noscript`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `hydration/test.ts :: option-rich-content-static`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: raw`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: raw-empty`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: raw-mismatch-static`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: raw-repair`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: raw-svg`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: raw-with-empty-line-at-top`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: repairs-apparent-static-content`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: rich-select`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: safari-borking`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: safari-borking-2`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: script`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: snippet-raw-hydrate`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `hydration/test.ts :: standalone-component`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: standalone-snippet`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: surrounding-whitespace`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: text-fallback`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: top-level-text`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `hydration/test.ts :: whitespace-at-block-start`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > binding-files (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > binding-files (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > binding-width-height-initialize (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > binding-width-height-initialize (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > binding-width-height-this-timing (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > binding-width-height-this-timing (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > browser-events-ending-with-capture (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > browser-events-ending-with-capture (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > component-css-custom-properties (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > component-css-custom-properties (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > component-css-custom-properties-dynamic (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > component-css-custom-properties-dynamic (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > component-css-custom-properties-dynamic-svg (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > component-css-custom-properties-dynamic-svg (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > component-event-handler-contenteditable-false (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > component-event-handler-contenteditable-false (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > component-slot-binding-dimensions (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > component-slot-binding-dimensions (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > css-props-dynamic-component (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > css-props-dynamic-component (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > dynamic-element-custom-element (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > dynamic-element-hydration-preserves-connection (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > dynamic-element-hydration-preserves-connection (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > head-script (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > head-script (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > head-scripts (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > html-tag-script (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > html-tag-script-2 (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > inline-style-directive-important (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > inline-style-directive-important (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > inline-style-directive-precedence (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > inline-style-directive-precedence (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > inline-style-directive-update-with-spread (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > inline-style-directive-update-with-spread (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > mount-in-iframe (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > mount-in-iframe (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > svelte-component-css-custom-properties (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > svelte-component-css-custom-properties (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > svelte-component-css-custom-properties-dynamic (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > svelte-component-css-custom-properties-dynamic (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > svelte-component-css-custom-properties2 (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > svelte-component-css-custom-properties2 (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > svelte-self-css-custom-properties (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > svelte-self-css-custom-properties (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > svelte-self-css-custom-properties-dynamic (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > svelte-self-css-custom-properties-dynamic (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: runtime-browser > svelte-self-css-custom-properties2 (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: runtime-browser > svelte-self-css-custom-properties2 (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: custom-elements > $$props`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > $$slot`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: custom-elements > $$slot-dynamic-content`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > action`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: custom-elements > camel-case-attribute`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > ce-options-valid`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > closed-shadow-dom`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > custom-class`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > custom-method`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > deferred-nested-styles`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > escaped-css`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > events`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: custom-elements > extended-builtin`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > html`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > html-slots`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > nested`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: custom-elements > new-styled`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > no-shadow-dom`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > no-tag`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > no-tag-ce-options`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > oncreate`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: custom-elements > ondestroy`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: custom-elements > propagate-prop-changes`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > props`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); compiled output uses legacy runtime helpers
+- `runtime-browser/test.ts :: custom-elements > reflect-attributes`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > reflect-attributes-add-remove`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > set-property-before-mounted`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-browser/test.ts :: custom-elements > shadow-root-init-options`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component)
+- `runtime-runes/test.ts :: before-update-in-legacy-child (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); sample opts out of runes; compiled output uses legacy runtime helpers
+- `runtime-runes/test.ts :: before-update-in-legacy-child (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); sample opts out of runes; compiled output uses legacy runtime helpers
+- `runtime-runes/test.ts :: before-update-in-legacy-child (ssr)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); sample opts out of runes; compiled output uses legacy runtime helpers
+- `runtime-runes/test.ts :: binding-interop (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); sample opts out of runes; compiled output uses legacy runtime helpers
+- `runtime-runes/test.ts :: binding-interop-derived (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); sample opts out of runes; compiled output uses legacy runtime helpers
+- `runtime-runes/test.ts :: binding-interop-derived (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); sample opts out of runes; compiled output uses legacy runtime helpers
+- `runtime-runes/test.ts :: binding-interop-derived (ssr)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); sample opts out of runes; compiled output uses legacy runtime helpers
+- `runtime-runes/test.ts :: fine-grained-prop-reactive-statement (dom)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); sample opts out of runes; compiled output uses legacy runtime helpers
+- `runtime-runes/test.ts :: fine-grained-prop-reactive-statement (hydrate)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); sample opts out of runes; compiled output uses legacy runtime helpers
+- `runtime-runes/test.ts :: fine-grained-prop-reactive-statement (ssr)`: hit the svelte-lite stub for legacy mode (Svelte 4 syntax); compiled output enables legacy mode (non-runes component); sample opts out of runes; compiled output uses legacy runtime helpers
+- … 8 more in `dist/minimal+strict-hydration+short-errors/svelte-tests*.json`
+
+</details>
+
+<details><summary><b>legacy + transitions</b>: 225 test(s)</summary>
+
+Detected by: runtime-legacy suite: non-runes components (createClassComponent, legacy mode) (225); hit the svelte-lite stub for legacy mode (Svelte 4 syntax) (225); compiled output enables legacy mode (non-runes component) (225); compiled output uses transition:/in:/out:/animate: (225); compiled output uses legacy runtime helpers (57); uses svelte/legacy (Svelte 4 component API) (2); mount/hydrate with intro: true (23)
+
+Per suite: runtime-legacy 225
+
+
+</details>
+
+<details><summary><b>transitions</b>: 40 test(s)</summary>
+
+Detected by: compiled output uses transition:/in:/out:/animate: (40)
+
+Per suite: runtime-runes 40
+
+- `runtime-runes/test.ts :: dynamic-component-transition (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: dynamic-component-transition (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: dynamic-if-component-transition (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: dynamic-if-component-transition (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: dynamic-transition (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: dynamic-transition (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: each-updates-12 (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: each-updates-12 (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: each-updates-13 (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: each-updates-13 (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: effect-tracking-transition (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: effect-tracking-transition (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: if-nested-template (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: if-nested-template (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: if-transition-inert (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: if-transition-inert (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: mount-intro-transition (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: mount-intro-transition (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-delayed (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-delayed (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-delayed-events-css (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-delayed-events-css (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-delayed-events-js (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-delayed-events-js (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-each (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-each (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-each-2 (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-each-2 (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-each-3 (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-each-3 (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-each-4 (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-each-4 (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-evaluation (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-evaluation (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-if (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-if (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-snippet (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-snippet (hydrate)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-static-subtree (dom)`: compiled output uses transition:/in:/out:/animate:
+- `runtime-runes/test.ts :: transition-static-subtree (hydrate)`: compiled output uses transition:/in:/out:/animate:
+
+</details>
+
+<details><summary><b>async</b>: 34 test(s)</summary>
+
+Detected by: hit the svelte-lite stub for experimental.async (3); compiled with experimental.async (1); compiled output uses async runtime ($.async/$.save/$.pending/…) (1); experimental.async in _config.js (1); <svelte:boundary> with pending (1); test file enables async mode in a hook (enable_async_mode_flag() throws) (32)
+
+Per suite: hydration 1, signals 1, unit 32
+
+- `hydration/test.ts :: boundary-pending-attribute`: hit the svelte-lite stub for experimental.async; compiled with experimental.async; compiled output uses async runtime ($.async/$.save/$.pending/…); experimental.async in _config.js; <svelte:boundary> with pending
+- `signals/test.ts :: signals > effects do depend on state they own (runes mode)`: hit the svelte-lite stub for experimental.async
+- `packages/svelte/src/internal/server/hydratable.test.ts :: treats replacement tokens in hydratable promise values as literals`: hit the svelte-lite stub for experimental.async; test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'sync children, async transformError' > 'escapes -->'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'sync children, async transformError' > 'escapes <!--'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'sync children, async transformError' > 'escapes <!-->'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'sync children, async transformError' > 'escapes <!--->'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'sync children, async transformError' > 'escapes multiple -->'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'sync children, async transformError' > 'escapes --->'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'sync children, async transformError' > 'no double-encoding'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'sync children, async transformError' > 'the terrifying special pointy boy'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'async children throw' > 'escapes -->'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'async children throw' > 'escapes <!--'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'async children throw' > 'escapes <!-->'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'async children throw' > 'escapes <!--->'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'async children throw' > 'escapes multiple -->'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'async children throw' > 'escapes --->'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'async children throw' > 'no double-encoding'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: boundary hydration comment escaping > 'async children throw' > 'the terrifying special pointy boy'`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > awaiting renderer gets async content`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > push accepts async functions in async context`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > push handles async functions with different timing`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > push async functions work with head content type`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > push async functions can be mixed with child renderers`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > push async functions are not supported in sync context`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > on_destroy yields callbacks in the correct order`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > on_destroy callbacks run when a sync render throws`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > on_destroy callbacks run when an async render rejects`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > on_destroy waits for in-flight renderers when an async render rejects`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > aborts in-flight renderers before waiting for them`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > on_destroy waits for every run invocation when an async render rejects`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > abort signals are scoped to a render`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > a throwing on_destroy callback does not mask a sync render error`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+- `packages/svelte/src/internal/server/renderer.test.ts :: async > a throwing on_destroy callback does not mask an async render error`: test file enables async mode in a hook (enable_async_mode_flag() throws)
+
+</details>
+
+<details><summary><b>hydration-recovery</b>: 5 test(s)</summary>
+
+Detected by: strict hydration: hydrate() threw hydration_failed instead of recovering from a mismatch (5)
+
+Per suite: runtime-runes 5
+
+- `runtime-runes/test.ts :: event-global-hydration-error-cleanup (hydrate)`: strict hydration: hydrate() threw hydration_failed instead of recovering from a mismatch
+- `runtime-runes/test.ts :: invalid-html-ssr (hydrate)`: strict hydration: hydrate() threw hydration_failed instead of recovering from a mismatch
+- `runtime-runes/test.ts :: invalid-html-ssr-ancestor (hydrate)`: strict hydration: hydrate() threw hydration_failed instead of recovering from a mismatch
+- `runtime-runes/test.ts :: snippet-raw-component (dom)`: strict hydration: hydrate() threw hydration_failed instead of recovering from a mismatch
+- `runtime-runes/test.ts :: snippet-raw-component-ssr-dev (dom)`: strict hydration: hydrate() threw hydration_failed instead of recovering from a mismatch
+
+</details>
+
+<details><summary><b>root-boundary</b>: 2 test(s)</summary>
+
+Detected by: mount/hydrate transformError option (2)
+
+Per suite: runtime-runes 2
+
+- `runtime-runes/test.ts :: error-boundary-26 (dom)`: mount/hydrate transformError option
+- `runtime-runes/test.ts :: error-boundary-27 (dom)`: mount/hydrate transformError option
+
+</details>
+
 ## `minimal--with-dev-const` (async mode off)
 
 Svelte `f90853565966bc0bab57c99fe7d669a91bef0f4c` · async mode **off** (SVELTE_NO_ASYNC=true, as in the official TestNoAsync CI job) · 75s · techniques not applied: 

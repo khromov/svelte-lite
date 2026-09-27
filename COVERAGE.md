@@ -6,99 +6,88 @@ V8 precise **block** coverage of `main.min.js` while each app is hydrated from i
 
 "Never executed" means this test didn't run it. It is an upper bound on what could be dropped for this app, not a list of dead code: error handling, teardown and update paths the test doesn't trigger are still needed.
 
-Svelte: baseline = ? · optimized = ? · minimal = main @ f90853565966
+Svelte: baseline = main @ f90853565966 · optimized = main @ f90853565966 · minimal = main @ f90853565966 · minimal+strict-hydration+short-errors = main @ f90853565966
 
 <!-- notes:start -->
 ## Findings (hand-written, 2026-09-27)
 
-**`minimal` executes 41–64% of what it ships, up from 20–39% for vanilla Svelte.** About 7–12 KB (min) per app never runs in these tests. Almost all of it is code a real app needs as soon as it does something the short test didn't: an error, a teardown, an item move, a `$effect`. Only a small part is waste.
+**`minimal` executes 42–65% of what it ships, up from 20–39% for vanilla Svelte.** About 7–11 KB (min) per app never runs in these tests. Almost all of it is code a real app needs as soon as it does something the short test didn't: an error, a teardown, an item move, a `$effect`.
 
-Why the never-executed bytes in `minimal` didn't run (min bytes, grouped by function):
+**Provably dead code: 0 B in every bundle.** The dead-code post-pass (`postpass.ts`, part of `optimized`) removes what Bun 1.4.2 leaves in:
+
+| Pattern Bun leaves | Typical source |
+| --- | --- |
+| Constant-false blocks that declare a `var` (`if (!1) { var …; for … }`) | Dev-only tracing in `get()`, `infinite_loop_guard` |
+| Code after a folded `return` | `Batch.apply()` once `async_mode_flag` is a constant |
+| Expressions with a constant test (`!1 && x`, `!1 ? a : b`) | — |
+
+Before it: 248–263 B per bundle in `optimized`, 293–617 B in `minimal`.
+
+Why the never-executed bytes didn't run (min bytes, grouped by function), for `minimal` → `minimal+strict-hydration+short-errors`:
 
 | reason | hello | reactive | boundary | stores | removable? |
 | --- | ---: | ---: | ---: | ---: | --- |
-| **provably dead** (can never run) | 293 | 617 | 610 | 476 | **yes, losslessly**: see below |
-| hydration mismatch recovery (`hydrate()` fallback, `mount`, `clear_text_content`, mismatch warning) | 430 | 459 | 430 | 432 | yes, with a "strict hydration" option that throws on mismatch instead of re-rendering |
-| error handling and messages (`errors.js`, `warnings.js`, `invoke_error_boundary`, `handle_error`) | 484 | 781 | 628 | 844 | partly: message strings could become bare codes |
-| teardown (`destroy_effect(s)`, `remove_reaction`, `unregister`, `pause_*`) | 1,505 | 1,040 | 869 | 2,313 | no: runs whenever a branch, item or component goes away |
-| reactivity engine paths the test didn't trigger (update loop, `$effect` flushing, reconnecting deriveds, self-invalidation, template creation for client-rendered content) | 4,188 | 5,135 | 5,497 | 4,450 | no |
-| used features' untriggered branches (proxy traps, `to_style`/`to_class` variants, `bind_value` number handling, `{#each}` moves) | 76 | 3,565 | 2,777 | 2,238 | no |
-| **total never executed** | 6,976 | 11,597 | 10,811 | 10,753 | |
+| hydration mismatch recovery (`hydrate()` fallback, `mount`, `clear_text_content`, mismatch warning) | 430 → 124 | 459 → 184 | 430 → 123 | 432 → 157 | done with `--strict-hydration`. What remains is the `hydration_failed` throw and the mismatch warning |
+| error handling and messages (`errors.js`, `warnings.js`, `invoke_error_boundary`, `handle_error`) | 486 → 534 | 783 → 711 | 630 → 527 | 848 → 746 | `--short-errors` saves raw bytes but no gzip; numeric codes would save ~70 B gzip at the cost of readable messages |
+| teardown (`destroy_effect(s)`, `remove_reaction`, `unregister`, `pause_*`) | 1,515 | 1,040 | 869 | 2,317 | no: runs whenever a branch, item or component goes away |
+| reactivity engine paths the test didn't trigger (update loop, `$effect` flushing, reconnecting deriveds, self-invalidation, template creation for client-rendered content) | 4,183 | 5,140 | 5,502 | 4,452 | no |
+| used features' untriggered branches (proxy traps, `to_style`/`to_class` variants, `bind_value` number handling, `{#each}` moves) | 77 | 3,565 | 2,777 | 2,210 | no |
+| **total never executed** | 6,691 → 6,429 | 10,987 → 10,640 | 10,208 → 9,798 | 10,259 → 9,882 | |
 
 - **`hello` is a special case.** It's static, so after hydration nothing ever re-renders. The whole update loop (`Batch.#traverse`, `update_reaction`, `update_derived`) and template creation (`from_html`, `create_fragment_from_html`) never run. A hydrated page only creates DOM from templates for content rendered on the client *after* hydration, or during mismatch recovery.
 - **`$effect` flushing** (`flush_queued_effects`, about 400 B) never runs in any of these apps, because none of them uses `$effect`. It ships because the scheduler calls it unconditionally.
-
-### Provably dead code (lossless fixes, not applied yet)
-
-1. **`if (!1) { … }` blocks that declare a `var`.**
-   - Bun 1.4.2 keeps a constant-false block whole, loops and conditions included, when it contains a `var` declaration. It does this to preserve hoisting, but only the `var` names needed to stay.
-   - These are dev-only blocks that the DEV-const technique turned into `if (!1)`: the tracing block in `get()` (309 B) and `infinite_loop_guard` (72 B).
-   - Fix: a `postpass.ts` step that replaces such blocks with a bare `var a, b;`. This also belongs in `optimized`, which carries 248–263 B of this.
-2. **Code after `return` in `Batch.apply()` (221 B, every app).**
-   - Our own ASYNC patch inserts an early `return;`, and Bun keeps everything after it.
-   - Fix: the patch should delete the multi-batch loop instead.
 <!-- notes:end -->
 
 ## Executed share of `main.min.js`
 
-| app | baseline | optimized | minimal |
-| --- | ---: | ---: | ---: |
-| reactive | **39.0%** of 61,138 B | **50.1%** of 44,355 B | **63.6%** of 31,896 B |
-| boundary | **35.0%** of 48,850 B | **45.4%** of 33,587 B | **56.0%** of 24,594 B |
-| stores | **30.9%** of 54,540 B | **39.7%** of 37,892 B | **55.6%** of 24,227 B |
-| hello | **20.0%** of 41,544 B | **23.8%** of 27,372 B | **41.1%** of 11,836 B |
+| app | baseline | optimized | minimal | minimal+strict-hydration+short-errors |
+| --- | ---: | ---: | ---: | ---: |
+| reactive | **39.0%** of 61,138 B | **50.7%** of 43,605 B | **64.9%** of 31,281 B | **65.6%** of 30,934 B |
+| boundary | **35.0%** of 48,850 B | **45.7%** of 33,270 B | **57.5%** of 23,993 B | **58.5%** of 23,583 B |
+| stores | **30.9%** of 54,540 B | **39.9%** of 37,565 B | **56.7%** of 23,668 B | **57.6%** of 23,291 B |
+| hello | **20.0%** of 41,544 B | **23.9%** of 27,059 B | **41.5%** of 11,436 B | **42.5%** of 11,177 B |
 
 Never-executed bytes:
 
-| app | baseline | optimized | minimal |
-| --- | ---: | ---: | ---: |
-| reactive | 37,275 B | 22,141 B | 11,597 B |
-| boundary | 31,744 B | 18,340 B | 10,811 B |
-| stores | 37,694 B | 22,854 B | 10,753 B |
-| hello | 33,246 B | 20,853 B | 6,976 B |
+| app | baseline | optimized | minimal | minimal+strict-hydration+short-errors |
+| --- | ---: | ---: | ---: | ---: |
+| reactive | 37,275 B | 21,482 B | 10,987 B | 10,640 B |
+| boundary | 31,744 B | 18,074 B | 10,208 B | 9,798 B |
+| stores | 37,694 B | 22,592 B | 10,259 B | 9,882 B |
+| hello | 33,246 B | 20,590 B | 6,691 B | 6,429 B |
 
 ## Provably dead bytes
 
 Code that can never execute, whatever the app does: branches under a constant-false test (`if (!1)`, `!1 && x`) and statements after a `return`/`throw`. Pure waste, left in by Bun 1.4.2 or by our own patches. It is a subset of the never-executed bytes above.
 
-| app | baseline | optimized | minimal |
-| --- | ---: | ---: | ---: |
-| reactive | 0 B (0 sites) | 263 B (4 sites) | 617 B (5 sites) |
-| boundary | 0 B (0 sites) | 254 B (3 sites) | 610 B (4 sites) |
-| stores | 0 B (0 sites) | 263 B (4 sites) | 476 B (4 sites) |
-| hello | 0 B (0 sites) | 248 B (2 sites) | 293 B (2 sites) |
-
-Dead sites in `minimal`:
-
-| in | kind | min B | apps | code |
-| --- | --- | ---: | --- | --- |
-| `get` | if (false) | 309 | reactive, boundary, stores | `{if(!B&&reactivity_loss_tracker&&E===null&&ke===null&&!reactivity_loss…` |
-| `Batch.apply` | after return | 221 | reactive, boundary, stores, hello | `for(let t=vt;t!==null;t=t.#e){if(t===this\|\|t.is_fork)continue;var e;if…` |
-| `infinite_loop_guard` | if (false) | 72 | reactive, boundary, stores, hello | `{var e;for(let r of E.current.keys())for(let[n,l]of r.updated??[])var …` |
-| `BranchManager.ensure` | if (false) | 8 | reactive, boundary | `var n,l;else this.#r.set(e,Ve(()=>t(this.anchor)));if(this.#n.set(r,e)…` |
-| `each` | if (false) | 7 | reactive, stores | `var ot;var z=h?null:u.get(ue);if(z){if(z.v)Ot(z.v,he);if(z.i)Ot(z.i,V)…` |
+| app | baseline | optimized | minimal | minimal+strict-hydration+short-errors |
+| --- | ---: | ---: | ---: | ---: |
+| reactive | 0 B (0 sites) | 0 B (0 sites) | 0 B (0 sites) | 0 B (0 sites) |
+| boundary | 0 B (0 sites) | 0 B (0 sites) | 0 B (0 sites) | 0 B (0 sites) |
+| stores | 0 B (0 sites) | 0 B (0 sites) | 0 B (0 sites) | 0 B (0 sites) |
+| hello | 0 B (0 sites) | 0 B (0 sites) | 0 B (0 sites) | 0 B (0 sites) |
 
 Block-level vs function-level for `minimal`. Function-level (`scripts/coverage.ts`) counts a whole function as used once it runs at all:
 
 | app | block-level executed | function-level "ran" |
 | --- | ---: | ---: |
-| reactive | 63.6% | 90.9% |
-| boundary | 56.0% | 86.8% |
-| stores | 55.6% | 80.2% |
-| hello | 41.1% | 63.3% |
+| reactive | 64.9% | 91.0% |
+| boundary | 57.5% | 86.8% |
+| stores | 56.7% | 80.0% |
+| hello | 41.5% | 62.7% |
 
 ## `minimal`: never-executed bytes by category
 
 | category | reactive | boundary | stores | hello |
 | --- | ---: | ---: | ---: | ---: |
-| signals (sources/deriveds/runtime) | 2,628 | 2,953 | 2,401 | 2,148 |
-| batch/scheduling | 1,162 | 1,174 | 1,143 | 1,917 |
-| dom elements/bindings/blocks | 2,647 | 547 | 2,001 | 76 |
-| effects | 583 | 854 | 1,643 | 1,139 |
-| template/dom ops | 739 | 797 | 1,123 | 700 |
+| signals (sources/deriveds/runtime) | 2,319 | 2,644 | 2,221 | 2,153 |
+| dom elements/bindings/blocks | 2,632 | 539 | 1,965 | 77 |
+| batch/scheduling | 876 | 888 | 851 | 1,627 |
+| effects | 583 | 854 | 1,650 | 1,143 |
+| template/dom ops | 739 | 797 | 1,128 | 700 |
 | proxy ($state objects) | 907 | 1,993 | 0 | 0 |
-| boundary/async | 401 | 696 | 399 | 292 |
-| mount/render | 402 | 398 | 400 | 403 |
+| boundary/async | 401 | 696 | 401 | 292 |
+| mount/render | 402 | 398 | 400 | 398 |
 | errors | 438 | 444 | 503 | 146 |
 | events | 430 | 394 | 430 | 0 |
 | shared utils/constants | 954 | 6 | 0 | 6 |
@@ -112,77 +101,77 @@ Block-level vs function-level for `minimal`. Function-level (`scripts/coverage.t
 
 "never" = the whole function/member never ran; "partly" = it ran, but some of its branches didn't.
 
-### reactive: 11,597 of 31,896 B never executed
+### reactive: 10,987 of 31,281 B never executed
 
 | function / member | module | never executed | of | |
 | --- | --- | ---: | ---: | --- |
 | `proxy` | `svelte/src/internal/client/proxy.js` | 907 | 2,035 | partly |
 | `to_style` | `svelte/src/internal/shared/attributes.js` | 644 | 761 | partly |
-| `get` | `svelte/src/internal/client/runtime.js` | 606 | 1,002 | partly |
 | `flush_queued_effects` | `svelte/src/internal/client/reactivity/batch.js` | 407 | 454 | partly |
 | `bind_value` | `svelte/src/internal/client/dom/elements/bindings/input.js` | 383 | 665 | partly |
 | `reconcile` | `svelte/src/internal/client/dom/blocks/each.js` | 372 | 1,117 | partly |
 | `BranchManager.#commit` | `svelte/src/internal/client/dom/blocks/branches.js` | 322 | 584 | partly |
-| `each` | `svelte/src/internal/client/dom/blocks/each.js` | 282 | 996 | partly |
+| `get` | `svelte/src/internal/client/runtime.js` | 297 | 697 | partly |
+| `each` | `svelte/src/internal/client/dom/blocks/each.js` | 275 | 982 | partly |
 | `get_setters` | `svelte/src/internal/client/dom/elements/attributes.js` | 257 | 257 | never |
 | `hydrate` | `svelte/src/internal/client/render.js` | 231 | 434 | partly |
-| `Batch.apply` | `svelte/src/internal/client/reactivity/batch.js` | 221 | 244 | partly |
 | `handle_event_propagation` | `svelte/src/internal/client/dom/elements/events.js` | 220 | 733 | partly |
+| `schedule_possible_effect_self_invalidation` | `svelte/src/internal/client/runtime.js` | 216 | 216 | never |
 
-### boundary: 10,811 of 24,594 B never executed
+### boundary: 10,208 of 23,993 B never executed
 
 | function / member | module | never executed | of | |
 | --- | --- | ---: | ---: | --- |
 | `proxy` | `svelte/src/internal/client/proxy.js` | 1,993 | 2,042 | partly |
-| `get` | `svelte/src/internal/client/runtime.js` | 614 | 1,002 | partly |
 | `flush_queued_effects` | `svelte/src/internal/client/reactivity/batch.js` | 407 | 454 | partly |
 | `BranchManager.#commit` | `svelte/src/internal/client/dom/blocks/branches.js` | 396 | 582 | partly |
+| `get` | `svelte/src/internal/client/runtime.js` | 305 | 697 | partly |
 | `hydrate` | `svelte/src/internal/client/render.js` | 228 | 431 | partly |
-| `Batch.apply` | `svelte/src/internal/client/reactivity/batch.js` | 221 | 244 | partly |
 | `schedule_possible_effect_self_invalidation` | `svelte/src/internal/client/runtime.js` | 215 | 215 | never |
 | `skip_nodes` | `svelte/src/internal/client/dom/hydration.js` | 207 | 207 | never |
 | `update_reaction` | `svelte/src/internal/client/runtime.js` | 207 | 590 | partly |
 | `update_derived` | `svelte/src/internal/client/reactivity/deriveds.js` | 204 | 248 | partly |
 | `resume_children` | `svelte/src/internal/client/reactivity/effects.js` | 204 | 204 | never |
 | `handle_event_propagation` | `svelte/src/internal/client/dom/elements/events.js` | 184 | 729 | partly |
+| `Boundary.#handle_error` | `svelte/src/internal/client/dom/blocks/boundary.js` | 181 | 528 | partly |
 
-### stores: 10,753 of 24,227 B never executed
+### stores: 10,259 of 23,668 B never executed
 
 | function / member | module | never executed | of | |
 | --- | --- | ---: | ---: | --- |
-| `reconcile` | `svelte/src/internal/client/dom/blocks/each.js` | 878 | 1,131 | partly |
-| `get` | `svelte/src/internal/client/runtime.js` | 474 | 870 | partly |
-| `flush_queued_effects` | `svelte/src/internal/client/reactivity/batch.js` | 414 | 461 | partly |
+| `reconcile` | `svelte/src/internal/client/dom/blocks/each.js` | 855 | 1,106 | partly |
+| `flush_queued_effects` | `svelte/src/internal/client/reactivity/batch.js` | 407 | 454 | partly |
 | `remove_reaction` | `svelte/src/internal/client/runtime.js` | 320 | 320 | never |
-| `each` | `svelte/src/internal/client/dom/blocks/each.js` | 302 | 1,017 | partly |
+| `get` | `svelte/src/internal/client/runtime.js` | 297 | 698 | partly |
+| `each` | `svelte/src/internal/client/dom/blocks/each.js` | 288 | 978 | partly |
 | `destroy_effect` | `svelte/src/internal/client/reactivity/effects.js` | 284 | 284 | never |
-| `destroy_effects` | `svelte/src/internal/client/dom/blocks/each.js` | 256 | 256 | never |
-| `hydrate` | `svelte/src/internal/client/render.js` | 230 | 432 | partly |
-| `Batch.apply` | `svelte/src/internal/client/reactivity/batch.js` | 221 | 244 | partly |
-| `handle_event_propagation` | `svelte/src/internal/client/dom/elements/events.js` | 220 | 729 | partly |
-| `create_effect` | `svelte/src/internal/client/reactivity/effects.js` | 212 | 574 | partly |
+| `destroy_effects` | `svelte/src/internal/client/dom/blocks/each.js` | 255 | 255 | never |
+| `hydrate` | `svelte/src/internal/client/render.js` | 230 | 433 | partly |
+| `handle_event_propagation` | `svelte/src/internal/client/dom/elements/events.js` | 220 | 733 | partly |
+| `create_effect` | `svelte/src/internal/client/reactivity/effects.js` | 214 | 576 | partly |
 | `resume_children` | `svelte/src/internal/client/reactivity/effects.js` | 204 | 204 | never |
+| `invoke_error_boundary` | `svelte/src/internal/client/error-handling.js` | 199 | 199 | never |
 
-### hello: 6,976 of 11,836 B never executed
+### hello: 6,691 of 11,436 B never executed
 
 | function / member | module | never executed | of | |
 | --- | --- | ---: | ---: | --- |
 | `flush_queued_effects` | `svelte/src/internal/client/reactivity/batch.js` | 406 | 453 | partly |
-| `remove_reaction` | `svelte/src/internal/client/runtime.js` | 316 | 316 | never |
-| `Batch.#traverse` | `svelte/src/internal/client/reactivity/batch.js` | 291 | 291 | never |
-| `update_reaction` | `svelte/src/internal/client/runtime.js` | 290 | 596 | partly |
+| `remove_reaction` | `svelte/src/internal/client/runtime.js` | 319 | 319 | never |
+| `Batch.#traverse` | `svelte/src/internal/client/reactivity/batch.js` | 288 | 288 | never |
+| `update_reaction` | `svelte/src/internal/client/runtime.js` | 288 | 583 | partly |
 | `destroy_effect` | `svelte/src/internal/client/reactivity/effects.js` | 282 | 282 | never |
-| `update_derived` | `svelte/src/internal/client/reactivity/deriveds.js` | 247 | 247 | never |
-| `hydrate` | `svelte/src/internal/client/render.js` | 228 | 432 | partly |
+| `update_derived` | `svelte/src/internal/client/reactivity/deriveds.js` | 248 | 248 | never |
+| `hydrate` | `svelte/src/internal/client/render.js` | 228 | 430 | partly |
 | `create_effect` | `svelte/src/internal/client/reactivity/effects.js` | 223 | 570 | partly |
 | `Batch.#resolve` | `svelte/src/internal/client/reactivity/batch.js` | 221 | 221 | never |
-| `Batch.apply` | `svelte/src/internal/client/reactivity/batch.js` | 221 | 244 | partly |
-| `schedule_possible_effect_self_invalidation` | `svelte/src/internal/client/runtime.js` | 217 | 217 | never |
+| `schedule_possible_effect_self_invalidation` | `svelte/src/internal/client/runtime.js` | 215 | 215 | never |
 | `update_dependencies` | `svelte/src/internal/client/runtime.js` | 213 | 296 | partly |
+| `Batch.#process` | `svelte/src/internal/client/reactivity/batch.js` | 207 | 390 | partly |
 
 ## `minimal`: runtime functions no app ever executed
 
-34 runtime functions/members, 2,706 B (largest bundle's size of each), are shipped in at least one app and never ran in any of them.
+34 runtime functions/members, 2,636 B (largest bundle's size of each), are shipped in at least one app and never ran in any of them.
 
 | function / member | module | min B | shipped in |
 | --- | --- | ---: | --- |
@@ -192,7 +181,6 @@ Block-level vs function-level for `minimal`. Function-level (`scripts/coverage.t
 | `reconnect` | `svelte/src/internal/client/runtime.js` | 133 | reactive, boundary, stores |
 | `move_effect` | `svelte/src/internal/client/reactivity/effects.js` | 126 | reactive, boundary, stores |
 | `Boundary.#hydrate_failed_content` | `svelte/src/internal/client/dom/blocks/boundary.js` | 125 | boundary |
-| `infinite_loop_guard` | `svelte/src/internal/client/reactivity/batch.js` | 120 | reactive, boundary, stores, hello |
 | `flush_eager_effects` | `svelte/src/internal/client/reactivity/sources.js` | 111 | reactive, boundary, stores |
 | `unfreeze_derived_effects` | `svelte/src/internal/client/reactivity/deriveds.js` | 98 | reactive, boundary, stores |
 | `svelte_boundary_reset_onerror` | `svelte/src/internal/client/errors.js` | 80 | boundary |
@@ -211,6 +199,7 @@ Block-level vs function-level for `minimal`. Function-level (`scripts/coverage.t
 | `derived_inert` | `svelte/src/internal/client/warnings.js` | 65 | reactive, boundary, stores, hello |
 | `effect_orphan` | `svelte/src/internal/client/errors.js` | 65 | stores |
 | `next` | `svelte/src/internal/client/dom/hydration.js` | 57 | boundary |
+| `infinite_loop_guard` | `svelte/src/internal/client/reactivity/batch.js` | 50 | reactive, boundary, stores, hello |
 | `get2` | `svelte/src/store/shared/index.js` | 47 | stores |
 | `to_number` | `svelte/src/internal/client/dom/elements/bindings/input.js` | 37 | reactive |
 | `create_user_effect` | `svelte/src/internal/client/reactivity/effects.js` | 34 | reactive, boundary, stores, hello |

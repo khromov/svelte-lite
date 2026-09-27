@@ -5,7 +5,7 @@
  * running the same harness as check.ts under Node (scripts/v8-coverage.ts).
  *
  *   bun scripts/byte-coverage.ts [variant ...] [--app=<name>]
- *     default variants: baseline optimized minimal; default apps: every app in apps/
+ *     default variants: baseline optimized minimal minimal+strict-hydration+short-errors; default apps: every app in apps/
  *   bun scripts/byte-coverage.ts --report      regenerate COVERAGE.md from existing results
  *
  * Needs a prior build (dist/<variant>/<app>/) and Node >= 26 on PATH (or NODE=/path/to/node).
@@ -27,7 +27,7 @@ import { categorize, shortPath } from '../measure.ts';
 const acorn: any = await import(Bun.resolveSync('acorn', join(SVELTE_DIR, 'src')));
 const DIST = resolve(ROOT, process.env.SVELTE_LITE_DIST ?? 'dist');
 const NODE = process.env.NODE ?? 'node';
-const VARIANTS = ['baseline', 'optimized', 'minimal'];
+const VARIANTS = ['baseline', 'optimized', 'minimal', 'minimal+strict-hydration+short-errors'];
 const APPS = readdirSync(join(ROOT, 'apps')).filter((a) => existsSync(join(ROOT, 'apps', a, 'test.ts')));
 
 type V8Function = { functionName: string; ranges: Array<{ startOffset: number; endOffset: number; count: number }> };
@@ -95,16 +95,26 @@ function deadCode(program: any, bytes: (a: number, b: number) => number, src: st
 		n &&
 		((n.type === 'UnaryExpression' && n.operator === '!' && n.argument.type === 'Literal' && n.argument.value === 1) ||
 			(n.type === 'Literal' && (n.value === false || n.value === 0 || n.value === null)));
+	const truthy = (n: any) =>
+		n &&
+		((n.type === 'UnaryExpression' && n.operator === '!' && n.argument.type === 'Literal' && n.argument.value === 0) ||
+			(n.type === 'Literal' && n.value === true));
 	const sites: Array<{ kind: string; start: number; end: number }> = [];
 	const walk = (n: any) => {
 		if (!n || typeof n.type !== 'string') return;
 		if (n.type === 'IfStatement' && falsy(n.test)) sites.push({ kind: 'if (false)', start: n.consequent.start, end: n.consequent.end });
+		else if (n.type === 'IfStatement' && truthy(n.test) && n.alternate) sites.push({ kind: 'if (true) else', start: n.alternate.start, end: n.alternate.end });
 		else if (n.type === 'ConditionalExpression' && falsy(n.test)) sites.push({ kind: 'false ? :', start: n.consequent.start, end: n.consequent.end });
+		else if (n.type === 'ConditionalExpression' && truthy(n.test)) sites.push({ kind: 'true ? :', start: n.alternate.start, end: n.alternate.end });
 		else if (n.type === 'LogicalExpression' && n.operator === '&&' && falsy(n.left)) sites.push({ kind: 'false &&', start: n.right.start, end: n.right.end });
+		else if (n.type === 'LogicalExpression' && n.operator === '||' && truthy(n.left)) sites.push({ kind: 'true ||', start: n.right.start, end: n.right.end });
 		const body = n.type === 'BlockStatement' || n.type === 'Program' ? n.body : n.type === 'SwitchCase' ? n.consequent : null;
 		if (body) {
 			const i = body.findIndex((s: any) => s.type === 'ReturnStatement' || s.type === 'ThrowStatement');
-			const rest = i >= 0 ? body.slice(i + 1).filter((s: any) => s.type !== 'FunctionDeclaration') : [];
+			// function declarations and bare `var x;` after a return are hoisted, not dead (postpass.ts keeps them too)
+			const hoisted = (s: any) =>
+				s.type === 'FunctionDeclaration' || (s.type === 'VariableDeclaration' && s.kind === 'var' && s.declarations.every((d: any) => !d.init));
+			const rest = i >= 0 ? body.slice(i + 1).filter((s: any) => !hoisted(s)) : [];
 			if (rest.length) sites.push({ kind: 'after return', start: rest[0].start, end: rest.at(-1).end });
 		}
 		for (const k in n) {

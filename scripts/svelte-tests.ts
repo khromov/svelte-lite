@@ -55,10 +55,11 @@ const SVELTE_DIR: string = L.SVELTE_DIR;
 const SVELTE_REPO: string = L.SVELTE_REPO ?? resolve(SVELTE_DIR, '../..');
 const CACHE = join(ROOT, '.cache', 'svelte-test');
 
-const { variants } = await import('../variants.ts');
+const { variants, resolveVariant, BUILD_FLAGS } = await import('../variants.ts');
 const { applyPatches } = await import('../plugins/patch.ts');
 const OPT = await import('../patches/optimized.ts');
 const MIN = await import('../patches/minimal.ts');
+const FLAG = await import('../patches/flags.ts');
 
 const TECHNIQUES: Record<string, any> = {
 	DEV_CONST: OPT.DEV_CONST,
@@ -70,7 +71,9 @@ const TECHNIQUES: Record<string, any> = {
 	TRANSITIONS: MIN.TRANSITIONS,
 	ROOT_BOUNDARY: MIN.ROOT_BOUNDARY,
 	DELEGATION: MIN.DELEGATION,
-	PROXY: MIN.PROXY
+	PROXY: MIN.PROXY,
+	STRICT_HYDRATION: FLAG.STRICT_HYDRATION,
+	SHORT_ERRORS: FLAG.SHORT_ERRORS
 };
 
 export const SUITES: Record<string, string> = {
@@ -98,11 +101,11 @@ if (argv.includes('--report')) {
 	process.exit(0);
 }
 const variantName = argv.find((a) => !a.startsWith('--'));
-if (!variantName || !variants[variantName]) {
-	console.error(`usage: bun run test:svelte <variant> [--suite=a,b] [--filter=x] [--without=T1,T2] [--async=on|off] [--fresh]\nvariants: ${Object.keys(variants).join(', ')}`);
+if (!variantName || !resolveVariant(variantName)) {
+	console.error(`usage: bun run test:svelte <variant>[+<flag>…] [--suite=a,b] [--filter=x] [--without=T1,T2] [--async=on|off] [--fresh]\nvariants: ${Object.keys(variants).join(', ')}; flags: ${Object.keys(BUILD_FLAGS).join(', ')}`);
 	process.exit(2);
 }
-const variant = variants[variantName];
+const variant = resolveVariant(variantName)!;
 const without = (flag('without') ?? '').split(',').filter(Boolean);
 for (const t of without) if (!TECHNIQUES[t]) throw new Error(`unknown technique ${t}; known: ${Object.keys(TECHNIQUES).join(', ')}`);
 const usesTechnique = (t: string) =>
@@ -366,7 +369,8 @@ const DROPPED: Record<string, string[]> = {
 	LEGACY: ['legacy'],
 	ASYNC: ['async'],
 	TRANSITIONS: ['transitions'],
-	ROOT_BOUNDARY: ['root-boundary']
+	ROOT_BOUNDARY: ['root-boundary'],
+	STRICT_HYDRATION: ['hydration-recovery']
 };
 
 function readAll(dir: string, pred: (f: string) => boolean): string {
@@ -403,6 +407,8 @@ function detectFeatures(r: Result, refCopy: string): Array<{ feature: string; re
 	// the test ran into one of the variant's "svelte-lite: … is not supported" stubs
 	const stub = r.message?.match(/svelte-lite: ([^\n]*?) is not supported/);
 	if (stub) add(/legacy/.test(stub[1]) ? 'legacy' : 'async', `hit the svelte-lite stub for ${stub[1]}`);
+	// --strict-hydration: a mismatch throws hydration_failed instead of re-rendering on the client
+	if (r.message?.includes('hydration_failed')) add('hydration-recovery', 'strict hydration: hydrate() threw hydration_failed instead of recovering from a mismatch');
 	// test files (not samples) whose hooks switch async/legacy mode on: their tests are skipped
 	// when the hook throws
 	if (r.status === 'skipped' && !dir) {

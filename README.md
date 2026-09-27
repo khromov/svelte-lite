@@ -6,8 +6,8 @@ On the test apps, gzipped `main.min.js`:
 
 | app | baseline | optimized (lossless) | minimal |
 | --- | ---: | ---: | ---: |
-| Hello World | 15,542 B | 10,575 B (−32%) | 5,098 B (−67%) |
-| reactive app | 22,801 B | 17,117 B (−25%) | 13,010 B (−43%) |
+| Hello World | 15,542 B | 10,428 B (−33%) | 4,953 B (−68%) |
+| reactive app | 22,801 B | 16,846 B (−26%) | 12,776 B (−44%) |
 
 `minimal` drops:
 - legacy (Svelte 4) mode
@@ -21,6 +21,7 @@ On the test apps, gzipped `main.min.js`:
 bun install
 bun run vendor 5.57.1          # or: main, svelte@5.57.1, <commit sha>
 bun run build.ts minimal       # also: baseline, optimized, --all
+bun run build.ts minimal --strict-hydration --short-errors   # opt-in build flags
 bun run check.ts               # behavioural checks, patch anchors, negative tests
 bun run test:svelte minimal    # Svelte's own test suite against the patched runtime
 ```

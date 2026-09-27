@@ -38,7 +38,9 @@ async function sizeTable(apps: string[]) {
 	md.push('| app | variant | raw | gzip | brotli | Δ raw vs baseline | Δ gzip | Δ brotli |', '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |');
 	for (const app of apps) {
 		const base = await size('baseline', app);
-		for (const v of ['baseline', 'optimized', 'minimal']) {
+		const flagged = 'minimal+strict-hydration+short-errors';
+		const built = existsSync(join(resolve(ROOT, process.env.SVELTE_LITE_DIST ?? 'dist'), flagged, app, 'report.json'));
+		for (const v of ['baseline', 'optimized', 'minimal', ...(built ? [flagged] : [])]) {
 			const s = await size(v, app);
 			const d = (k: 'raw' | 'gzip' | 'brotli') => (v === 'baseline' ? '' : `${delta(s[k], base[k])} (${pct(s[k], base[k])})`);
 			md.push(`| ${app} | ${v === 'minimal' ? '**minimal**' : v} | ${n(s.raw)} | ${n(s.gzip)} | ${n(s.brotli)} | ${d('raw')} | ${d('gzip')} | ${d('brotli')} |`);
@@ -62,7 +64,9 @@ const LABEL: Record<string, string> = {
 	'm3-transitions': '+ drop transitions/animations',
 	'm4-boundary': '+ skip root boundary',
 	'm5-delegation': '+ lazy event delegation',
-	minimal: '+ tree-shakable $state proxy'
+	minimal: '+ tree-shakable $state proxy',
+	'minimal+strict-hydration': '+ `--strict-hydration` (flag)',
+	'minimal+strict-hydration+short-errors': '+ `--short-errors` (flag)'
 };
 let prev: Record<string, { raw: number; gzip: number }> = {};
 for (const v of STACK_ORDER) {

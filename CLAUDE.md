@@ -28,6 +28,7 @@ bun run vendor --list                # what's vendored (* = active)
 bun run anchors [--svelte=<ref>]     # do all patch anchors apply to that ref? (no build)
 
 bun run build.ts <variant> [--app=reactive] [--no-coverage] [--svelte=<ref>] [--out=<dir>]
+bun run build.ts minimal --strict-hydration --short-errors   # build flags -> dist/minimal+strict-hydration+short-errors/
 bun run build.ts --all               # every variant x app; about 15 min (coverage and compression dominate)
 bun run check.ts [variant]           # happy-dom check + patch anchors + negative tests
 bun run test:svelte <variant> [--suite=runtime-runes] [--filter=<sample>] [--without=PROXY] [--async=on|off] [--fresh]
@@ -48,6 +49,13 @@ bun run test:svelte --report         # regenerate SVELTE_TESTS.md from saved res
 | `minimal` | `optimized` plus: no legacy mode, no async, no transitions/animations, no root boundary in `_mount`, lazy event delegation, `proxy()` only when used |
 | `m1-legacy` … `m5-delegation` | Cumulative steps between `optimized` and `minimal`, for the stacking table |
 
+**Build flags** (`patches/flags.ts`, `BUILD_FLAGS` in `variants.ts`) are opt-in techniques you can stack on any variant. A flagged build is its own variant, `<variant>+<flag>…`: it goes to `dist/<variant>+<flag>…/`, and names like `minimal+strict-hydration` also work in `check.ts` and `test:svelte`.
+
+| Flag | What it does |
+|---|---|
+| `--strict-hydration` | A hydration mismatch throws `hydration_failed` instead of clearing the target and re-rendering on the client. It's like `hydrate(…, { recover: false })`, except the recovery code no longer ships. The `hydration_mismatch` warning stays. `harness.ts` expects the throw for these variants |
+| `--short-errors` | Every production error/warning function calls one shared helper with just its code. The message text is unchanged; stacks gain one frame. This saves raw and brotli bytes, but gzip was already compressing the repeated URL prefix (see Known state) |
+
 **Apps** (`apps/`):
 
 | App | What it covers |
@@ -62,7 +70,7 @@ bun run test:svelte --report         # regenerate SVELTE_TESTS.md from saved res
 | Path | What it is |
 |---|---|
 | `build.ts`, `variants.ts` | Build driver; variants are composed from techniques |
-| `patches/optimized.ts`, `patches/minimal.ts` | Patch definitions, grouped by technique (`LEGACY`, `ASYNC`, `TRANSITIONS`, `ROOT_BOUNDARY`, `DELEGATION`, `PROXY`, …) |
+| `patches/optimized.ts`, `patches/minimal.ts`, `patches/flags.ts` | Patch definitions, grouped by technique (`LEGACY`, `ASYNC`, `TRANSITIONS`, `ROOT_BOUNDARY`, `DELEGATION`, `PROXY`, …; build flags `STRICT_HYDRATION`, `SHORT_ERRORS`) |
 | `plugins/patch.ts` | Patch engine: `replace`, `removeMembers`, `removeFunctions`, `replaceFunctions`, `prepend`, `contents`, `constImports` |
 | `plugins/svelte.ts` | `.svelte` compile plugin, named imports, build-time bans |
 | `plugins/transform-compiled.js` | Compiled-output rewrite `$.set(x, v, true)` → `$.set(x, $.proxy(v))`; shared by the build and the test helper |
@@ -131,6 +139,7 @@ Most of the work here exists because Bun eliminates much less dead code than Rol
   
   Use `/*@__PURE__*/` annotations or restructure the code.
 - **Top-level side effects pull in whole modules.** `custom-element.js` dragged in `svelte/legacy` and `hydrate()`. The fix is named imports from compiled components plus `optimizeImports: ['svelte']`.
+- **gzip already removes repeated strings.** Replacing a repeated prefix, e.g. the `https://svelte.dev/e/` in 61 messages, with a shared helper saves raw bytes but almost no gzip. Only removing *unique* content saves gzip. Always compare gzip, not just raw.
 - **Minified names can shift** when eliminated code changes, giving the same raw bytes but a gzip size a few bytes different. Judge changes by raw size and a diff of `main.readable.js`, not gzip alone.
 - **Build-option limits:**
   - `feature()` from `bun:bundle` only works directly in an `if` or ternary.
@@ -149,7 +158,10 @@ Most of the work here exists because Bun eliminates much less dead code than Rol
 
 - The reference numbers came from upstream `main` at `f90853565966`, and vendored `main` reproduces them byte for byte.
 - **`svelte-ref.json` points at `svelte@5.57.1`, where `minimal` (and m2 through m5) fails.** The pinned `fork()` replacement hash in the `ASYNC` patch only matches `main`'s `fork()`. `baseline` and `optimized` build fine there. Until this is resolved, build `minimal` with `--svelte=main`. Whether to accept both hashes and re-pin to the tag, or to pin the `main` sha, is still an open decision for the user.
-- `COMPARISON.md` warns about mixed Svelte sources because the older `dist/` reports predate provenance stamping. A full `--all` rebuild on one ref clears it.
+- Every `dist/` report was rebuilt from vendored `main` (`SVELTE_REF=main bun run build.ts --all`, plus the flagged `minimal` builds).
+- **Build flag results** (`COMPARISON.md`):
+  - `--strict-hydration` pays: −210 to −250 B min / −85 to −105 B gzip. Only Svelte's five recovery tests fail, and they are classified as expected.
+  - `--short-errors` saves raw bytes but gzip grows 4–18 B. Numeric error codes would save about 70 B gzip on `reactive`, but messages would become opaque numbers. That hasn't been adopted.
 - **Test coverage gaps for `minimal`:**
   - Most hydration and runtime-browser samples use legacy components, so only 19 hydration and 26 browser tests exercise `minimal`.
   - Only 15 tests exercise the proxy rewrite.

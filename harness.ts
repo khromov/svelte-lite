@@ -86,13 +86,17 @@ export async function harness(variant: string, app: string, bundle: string, scen
 		same: (a, b, msg) => void (a === b && a != null ? 0 : failures.push(`${msg}: not the same node`))
 	};
 
+	// --strict-hydration builds (variant name `…+strict-hydration…`) don't recover from a mismatch:
+	// hydrate() must throw hydration_failed instead of re-rendering on the client
+	const strict = variant.split('+').includes('strict-hydration');
+
 	let refs: any;
 	try {
 		if (scenario === 'normal') refs = test.before(document);
 		await import(pathToFileURL(bundle).href);
 		await tick();
 		if (scenario === 'normal') await test.after(document, refs, t);
-		else await test.mismatch!.after(document, t);
+		else if (!strict) await test.mismatch!.after(document, t);
 	} catch (e: any) {
 		errors.push(e?.stack ?? String(e));
 	}
@@ -101,6 +105,11 @@ export async function harness(variant: string, app: string, bundle: string, scen
 		const mismatch = logged.filter((l) => l.includes('hydration_mismatch'));
 		if (mismatch.length === 0) failures.push('expected a hydration_mismatch warning');
 		logged.splice(0, logged.length, ...logged.filter((l) => !l.includes('hydration_mismatch')));
+		if (strict) {
+			const i = errors.findIndex((e) => e.includes('https://svelte.dev/e/hydration_failed'));
+			if (i < 0) failures.push('strict hydration: expected hydrate() to throw hydration_failed');
+			else errors.splice(i, 1);
+		}
 	}
 	const ok = failures.length === 0 && errors.length === 0 && logged.length === 0;
 	await GlobalRegistrator.unregister();

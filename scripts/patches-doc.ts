@@ -21,10 +21,11 @@ import { ROOT, SVELTE_DIR, assertPristine, svelteLabel, SVELTE_INFO } from './li
 // re-points the shared node_modules/svelte symlink: safe to run for any ref, even mid-build.
 assertPristine();
 console.log(`patch anchors vs ${svelteLabel()}`);
-const { variants } = await import('../variants.ts');
+const { BUILD_FLAGS, flaggedName, resolveVariant } = await import('../variants.ts');
 const { applyPatches } = await import('../plugins/patch.ts');
 const T = await import('../patches/optimized.ts');
 const M = await import('../patches/minimal.ts');
+const F = await import('../patches/flags.ts');
 
 const SRC = join(SVELTE_DIR, 'src');
 const files: string[] = [];
@@ -65,11 +66,14 @@ const TECHNIQUES: Array<[string, any]> = [
 	['minimal: TRANSITIONS', M.TRANSITIONS],
 	['minimal: ROOT_BOUNDARY', M.ROOT_BOUNDARY],
 	['minimal: DELEGATION', M.DELEGATION],
-	['minimal: PROXY', M.PROXY]
+	['minimal: PROXY', M.PROXY],
+	['flag: STRICT_HYDRATION', F.STRICT_HYDRATION],
+	['flag: SHORT_ERRORS', F.SHORT_ERRORS]
 ];
 
-// Apply the full `minimal` patch list in order, one patch at a time, attributing diffs.
-const minimal = variants.minimal;
+// Apply the full `minimal` patch list plus every build flag (the longest chain) in order, one
+// patch at a time, attributing diffs.
+const minimal = resolveVariant(flaggedName('minimal', Object.keys(BUILD_FLAGS)))!;
 const rows: Row[] = [];
 const constRows = new Map<string, Row>();
 let failures = 0;
@@ -143,7 +147,7 @@ if (failures) {
 	for (const f of failed) console.error(`  FAIL ${f.technique.padEnd(22)} ${f.file.replace(/^src\//, '')}  ${f.why}\n       -> ${f.error}`);
 	process.exit(1);
 }
-console.log(`all ${minimal.patches?.length} minimal patches (incl. optimized) apply cleanly to ${files.length} runtime files`);
+console.log(`all ${minimal.patches?.length} minimal patches (incl. optimized and build flags) apply cleanly to ${files.length} runtime files`);
 if (process.argv.includes('--check')) process.exit(0);
 
 // ---------------------------------------------------------------------------------------------
@@ -165,7 +169,8 @@ md.push(
 );
 md.push(`## Summary`, '');
 md.push(`| technique | variant | patches | files | upstream lines removed | lines added |`, `| --- | --- | ---: | ---: | ---: | ---: |`);
-const variantOf = (name: string) => (name.startsWith('optimized') || name.includes('(dev)') ? 'optimized' : 'minimal');
+const variantOf = (name: string) =>
+	name.startsWith('flag') ? 'build flag' : name.startsWith('optimized') || name.includes('(dev)') ? 'optimized' : 'minimal';
 const summaryRows: Array<[string, number, Row[]]> = [];
 for (const [name, t] of TECHNIQUES) summaryRows.push([name, t.patches?.length ?? 0, byTechnique.get(name) ?? []]);
 for (const r of constList) summaryRows.push([r.technique + ` (${r.ops.match(/\{ (.*) \}/)?.[1]})`, 1, [r]]);
@@ -174,12 +179,13 @@ for (const [name, defs, rs] of summaryRows) {
 	md.push(`| ${name} | ${variantOf(name)} | ${defs} | ${nFiles} | ${sum(rs, 'removed')} | ${sum(rs, 'added')} |`);
 }
 const totals = (v: string) => {
-	const rs = summaryRows.filter(([n]) => v === 'minimal' || variantOf(n) === 'optimized');
+	const rs = summaryRows.filter(([n]) => (v === 'minimal' ? variantOf(n) !== 'build flag' : variantOf(n) === v));
 	const all = rs.flatMap(([, , r]) => r);
 	return `${rs.reduce((s, [, d]) => s + d, 0)} patches, ${new Set(all.flatMap((r) => r.file.split(', ').map((f) => f.replace(/^src\//, '')))).size} files, −${sum(all, 'removed')} / +${sum(all, 'added')} lines`;
 };
 md.push('', `- **optimized**: ${totals('optimized')} (plus the compiled-output transforms and options listed above).`);
-md.push(`- **minimal** (includes optimized): ${totals('minimal')}.`, '');
+md.push(`- **minimal** (includes optimized): ${totals('minimal')}.`);
+md.push(`- **build flags** (opt-in, \`--strict-hydration\` / \`--short-errors\` on top of any variant): ${totals('build flag')}.`, '');
 
 md.push(`## Every source patch`, '');
 md.push(`Lines are counted with \`diff\` against the file as it was before that patch (patches apply in this order).`, '');

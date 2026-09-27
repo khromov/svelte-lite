@@ -9,6 +9,11 @@
  *                                     measure and coverage follow via SVELTE_LITE_DIST)
  *   --svelte=<ref>                    build against another vendored Svelte (`bun run vendor <ref>`)
  *                                     instead of svelte-ref.json; see scripts/link-svelte.ts
+ *   --strict-hydration                build flag (patches/flags.ts): a hydration mismatch throws
+ *                                     instead of re-rendering on the client
+ *   --short-errors                    build flag: error/warning messages built by one shared helper
+ *                                     Flagged builds go to dist/<variant>+<flag>…/ (names like
+ *                                     `minimal+short-errors` also work as variant arguments).
  *
  * Svelte comes from scripts/link-svelte.ts (the vendored ref in svelte-ref.json by default);
  * the build refuses to run if that checkout's packages/svelte has local changes.
@@ -36,7 +41,13 @@ import {
   SVELTE_DIR,
   svelteLabel,
 } from "./scripts/link-svelte.ts";
-import { variants, type Variant } from "./variants.ts";
+import {
+  BUILD_FLAGS,
+  flaggedName,
+  resolveVariant,
+  variants,
+  type Variant,
+} from "./variants.ts";
 
 // --out=<dir>: children (check, coverage) and measure/check in this process read SVELTE_LITE_DIST
 const outFlag = process.argv
@@ -309,6 +320,13 @@ if (import.meta.main) {
   let names = args.filter((a) => !a.startsWith("--"));
   if (flags.has("--all")) names = Object.keys(variants);
   if (names.length === 0) names = ["baseline"];
+  // build flags (--strict-hydration, --short-errors): stacked on every variant being built,
+  // each flagged build goes to dist/<variant>+<flag>…/
+  const buildFlags = Object.keys(BUILD_FLAGS).filter((f) => flags.has(`--${f}`));
+  names = names.map((n) => {
+    const [base, ...own] = n.split("+");
+    return flaggedName(base, [...own, ...buildFlags]);
+  });
   const apps = appFlag ? [appFlag] : APPS;
 
   const { measure } = await import("./measure.ts");
@@ -318,10 +336,10 @@ if (import.meta.main) {
   );
 
   for (const name of names) {
-    const variant = variants[name];
+    const variant = resolveVariant(name);
     if (!variant) {
       console.error(
-        `unknown variant "${name}". known: ${Object.keys(variants).join(", ")}`,
+        `unknown variant "${name}". known: ${Object.keys(variants).join(", ")}; flags: ${Object.keys(BUILD_FLAGS).map((f) => `--${f}`).join(", ")}`,
       );
       process.exit(1);
     }
