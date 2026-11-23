@@ -34,6 +34,7 @@ import {
 	block,
 	branch,
 	destroy_effect,
+	has_transitions,
 	pause_effect,
 	resume_effect
 } from '../../reactivity/effects.ts';
@@ -70,6 +71,19 @@ function destroy_effects(to_destroy: Effect[], remove_dom = true) {
 
 /** Where items that are created after the first run render to, until `reconcile` moves them into place */
 var offscreen_anchor: Text | undefined;
+
+/**
+ * Whether an element with an `animate:` directive has been created. Nothing but `animation` sets
+ * this, before it gives an item its animation, so that a bundler can tell that an app without the
+ * directive never has an item to animate, whatever the flags of its each blocks. Until it is set,
+ * `nodes.a` is `null` on every effect. (It is not `has_transitions`: an app with one of the two
+ * does not pay for the other)
+ */
+export let has_animations = false;
+
+export function set_has_animations(): void {
+	has_animations = true;
+}
 
 /**
  * @param node The next sibling node, or the parent node if this is a 'controlled' block
@@ -110,7 +124,11 @@ export function each<V>(
 
 	var fallback: Effect | null = null;
 
-	/** The groups of items that are transitioning out together */
+	/**
+	 * The groups of items that are transitioning out together. `pause_effects` only makes one where
+	 * there are transitions. Where it never does, a bundler sees that this stays `null` and leaves out
+	 * what `reconcile` does with the groups
+	 */
 	var outrogroups: Set<EachOutroGroup> | null = null;
 
 	// TODO: ideally we could use derived for runes mode but because of the ability
@@ -141,32 +159,37 @@ export function each<V>(
 		var length = to_destroy.length;
 
 		var group: EachOutroGroup | undefined;
-		var remaining = to_destroy.length;
+
+		// Without transitions, an effect is paused by the time `pause_effect` returns: there is
+		// nothing to count down, and never a group of effects to wait for
+		var remaining = has_transitions ? length : 0;
 
 		for (var i = 0; i < length; i++) {
 			let effect = to_destroy[i];
 
 			pause_effect(
 				effect,
-				() => {
-					if (group) {
-						group.pending.delete(effect);
-						group.done.add(effect);
+				has_transitions
+					? () => {
+							if (group) {
+								group.pending.delete(effect);
+								group.done.add(effect);
 
-						if (group.pending.size === 0) {
-							var groups = outrogroups as Set<EachOutroGroup>;
+								if (group.pending.size === 0) {
+									var groups = outrogroups as Set<EachOutroGroup>;
 
-							destroy_effects(array_from(group.done));
-							groups.delete(group);
+									destroy_effects(array_from(group.done));
+									groups.delete(group);
 
-							if (groups.size === 0) {
-								outrogroups = null;
+									if (groups.size === 0) {
+										outrogroups = null;
+									}
+								}
+							} else {
+								remaining -= 1;
 							}
 						}
-					} else {
-						remaining -= 1;
-					}
-				},
+					: undefined,
 				false
 			);
 		}
@@ -201,7 +224,7 @@ export function each<V>(
 	 * item that is not where the walk has got to in front of what is there
 	 */
 	function reconcile(array: V[]): void {
-		var is_animated = (flags & EACH_IS_ANIMATED) !== 0;
+		var is_animated = has_animations && (flags & EACH_IS_ANIMATED) !== 0;
 
 		var length = array.length;
 		var current = skip_to_branch(each_effect.first);

@@ -57,6 +57,19 @@ import { set_signal_status } from './status.ts';
 export let has_effects = false;
 
 /**
+ * Whether an element with a `transition:`, `in:` or `out:` directive has been created. Nothing but
+ * `transition` sets this, before it gives an effect its first transition, so that a bundler can
+ * tell that an app without those directives never has a transition to play, to stop or to wait
+ * for. Until it is set, `nodes.t` is `null` on every effect. (`animate:` has a flag of its own,
+ * `has_animations` in each.ts)
+ */
+export let has_transitions = false;
+
+export function set_has_transitions(): void {
+	has_transitions = true;
+}
+
+/**
  * Checks that a rune that creates an effect is used where it can. Only called in dev mode
  */
 export function validate_effect(rune: '$effect' | '$effect.pre' | '$inspect'): void {
@@ -423,11 +436,13 @@ export function destroy_effect(effect: Effect, remove_dom = true): void {
 	destroy_effect_children(effect, remove_dom && !removed);
 	remove_reactions(effect, 0);
 
-	var transitions = effect.nodes && effect.nodes.t;
+	if (has_transitions) {
+		var transitions = effect.nodes && effect.nodes.t;
 
-	if (transitions !== null) {
-		for (const transition of transitions) {
-			transition.stop();
+		if (transitions !== null) {
+			for (const transition of transitions) {
+				transition.stop();
+			}
 		}
 	}
 
@@ -506,7 +521,8 @@ export function pause_effect(effect: Effect, callback?: () => void, destroy = tr
 
 	var remaining = transitions.length;
 
-	if (remaining > 0) {
+	// (without transitions there is nothing to wait for, and pausing is synchronous)
+	if (has_transitions && remaining > 0) {
 		var check = () => --remaining || fn();
 
 		for (var transition of transitions) {
@@ -521,12 +537,14 @@ function pause_children(effect: Effect, transitions: TransitionManager[], local:
 	if ((effect.f & INERT) !== 0) return;
 	effect.f ^= INERT;
 
-	var t = effect.nodes && effect.nodes.t;
+	if (has_transitions) {
+		var t = effect.nodes && effect.nodes.t;
 
-	if (t !== null) {
-		for (const transition of t) {
-			if (transition.is_global || local) {
-				transitions.push(transition);
+		if (t !== null) {
+			for (const transition of t) {
+				if (transition.is_global || local) {
+					transitions.push(transition);
+				}
 			}
 		}
 	}
@@ -539,12 +557,14 @@ function pause_children(effect: Effect, transitions: TransitionManager[], local:
 		// If this child is a root effect, then it will become an independent root when its parent
 		// is destroyed, it should therefore not become inert nor partake in transitions.
 		if ((child.f & ROOT_EFFECT) === 0) {
+			// (`local` only says which transitions take part)
 			var transparent =
-				(child.f & EFFECT_TRANSPARENT) !== 0 ||
-				// If this is a branch effect without a block effect parent,
-				// it means the parent block effect was pruned. In that case,
-				// transparency information was transferred to the branch effect.
-				((child.f & BRANCH_EFFECT) !== 0 && (effect.f & BLOCK_EFFECT) !== 0);
+				has_transitions &&
+				((child.f & EFFECT_TRANSPARENT) !== 0 ||
+					// If this is a branch effect without a block effect parent,
+					// it means the parent block effect was pruned. In that case,
+					// transparency information was transferred to the branch effect.
+					((child.f & BRANCH_EFFECT) !== 0 && (effect.f & BLOCK_EFFECT) !== 0));
 			// TODO we don't need to call pause_children recursively with a linked list in place
 			// it's slightly more involved though as we have to account for `transparent` changing
 			// through the tree.
@@ -586,7 +606,9 @@ function resume_children(effect: Effect, local: boolean): void {
 
 	while (child !== null) {
 		var sibling = child.next;
-		var transparent = (child.f & EFFECT_TRANSPARENT) !== 0 || (child.f & BRANCH_EFFECT) !== 0;
+		var transparent =
+			has_transitions &&
+			((child.f & EFFECT_TRANSPARENT) !== 0 || (child.f & BRANCH_EFFECT) !== 0);
 		// TODO we don't need to call resume_children recursively with a linked list in place
 		// it's slightly more involved though as we have to account for `transparent` changing
 		// through the tree.
@@ -594,12 +616,14 @@ function resume_children(effect: Effect, local: boolean): void {
 		child = sibling;
 	}
 
-	var t = effect.nodes && effect.nodes.t;
+	if (has_transitions) {
+		var t = effect.nodes && effect.nodes.t;
 
-	if (t !== null) {
-		for (const transition of t) {
-			if (transition.is_global || local) {
-				transition.in();
+		if (t !== null) {
+			for (const transition of t) {
+				if (transition.is_global || local) {
+					transition.in();
+				}
 			}
 		}
 	}
