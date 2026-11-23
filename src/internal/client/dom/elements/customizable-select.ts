@@ -78,7 +78,10 @@ export function customizable_select(
 	var was_hydrating = hydrating;
 
 	if (!is_supported()) {
-		set_hydrating(false);
+		// only when there is something to turn off: an unconditional call is a write to
+		// `hydrating` that a bundler has to keep, and with it all the code for hydration,
+		// in an app that never hydrates
+		if (hydrating) set_hydrating(false);
 		element.textContent = '';
 		element.append(create_comment(''));
 	}
