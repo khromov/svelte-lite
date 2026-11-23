@@ -42,6 +42,8 @@ is decided by what a bundler can prove unused, so:
   own entry point sets. With nothing importing that entry point, the bundler folds the flag
   to a constant and drops what it guards.
 - Code behind `DEV` (from `esm-env`) is free in production builds.
+- `bun run size` measures the result. A change that is meant to save bytes is not done until
+  it shows there.
 
 ## Testing
 

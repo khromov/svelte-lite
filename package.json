@@ -110,7 +110,8 @@
 		"upstream:sync-deps": "bun scripts/sync-upstream-deps.ts",
 		"upstream:update": "git submodule update --remote --depth 1 vendor/svelte && bun run upstream:sync-deps && bun run compat:audit --scaffold && bun test && bun run test:upstream",
 		"borrowed": "bun scripts/borrow.ts",
-		"scope": "bun scripts/scope.ts"
+		"scope": "bun scripts/scope.ts",
+		"size": "bun scripts/size.ts"
 	},
 	"devDependencies": {
 		"@jridgewell/remapping": "2.3.5",
@@ -135,7 +136,9 @@
 		"jsdom": "25.0.1",
 		"locate-character": "3.0.0",
 		"magic-string": "0.30.21",
+		"rollup": "4.62.2",
 		"source-map": "0.7.4",
+		"terser": "5.51.4",
 		"tinyglobby": "0.2.17",
 		"typescript": "5.5.4",
 		"vite": "7.3.5",

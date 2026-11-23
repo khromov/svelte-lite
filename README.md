@@ -30,6 +30,7 @@ for the browser tests.
 | `bun run test:types` | Svelte's type tests against svelte-lite (`SVELTE_IMPL=upstream` for the control) |
 | `bun test` | Unit tests of the harness |
 | `bun run check` | Type-checks this repo's own code |
+| `bun run size` | Bundle size of small apps, compared with Svelte (`SVELTE_IMPL=upstream` measures the reference) |
 | `bun run borrowed` | Lists the client modules that are still Svelte's |
 | `bun run scope` | Counts the tests that are out of scope, by the feature left out |
 
@@ -44,6 +45,14 @@ FILTER=/each/ bun run test                           # every sample matching a p
 Setting `FILTER` also turns on vitest's default reporter, with the full error and stack trace
 of every failure. A full run prints a table per suite, and lists the failing tests that are in
 scope in `.results/lite-failing.txt`.
+
+## Size
+
+`bun run size` compiles a set of small apps, bundles each the way a production build would
+(rollup with tree-shaking, `DEV` off, terser) and reports minified and gzipped bytes. Run it
+with `SVELTE_IMPL=upstream` once to measure Svelte itself; after that, measuring svelte-lite
+shows the difference per app. `--all` covers about 140 apps that each add one feature to a
+counter, which shows what that feature costs when it is used.
 
 ## What is left out
 
