@@ -13,7 +13,6 @@ import {
 import {
 	branch,
 	destroy_effect,
-	effect,
 	expressions,
 	managed
 } from '../../reactivity/effects.ts';
@@ -29,12 +28,6 @@ import { hydrating, set_hydrating } from '../hydration.ts';
 import { set_attribute as set_attribute_op } from '../operations.ts';
 import { queue_micro_task } from '../task.ts';
 import { attach } from './attachments.ts';
-import {
-	init_select,
-	select_option,
-	set_default_select_value,
-	set_selected
-} from './bindings/select.ts';
 import { set_class } from './class.ts';
 import { create_event } from './events.ts';
 import { add_form_reset_listener, autofocus } from './misc.ts';
@@ -51,8 +44,6 @@ const IS_HTML = Symbol('is html');
 
 const LINK_TAG = IS_XHTML ? 'link' : 'LINK';
 const INPUT_TAG = IS_XHTML ? 'input' : 'INPUT';
-const OPTION_TAG = IS_XHTML ? 'option' : 'OPTION';
-const SELECT_TAG = IS_XHTML ? 'select' : 'SELECT';
 const PROGRESS_TAG = IS_XHTML ? 'progress' : 'PROGRESS';
 
 /**
@@ -278,8 +269,6 @@ function set_attributes(
 	}
 
 	var current = prev || {};
-	var is_option_element = element.nodeName === OPTION_TAG;
-	var is_select_element = element.nodeName === SELECT_TAG;
 
 	// the properties that only some elements have, and the internal `__value`
 	var node = element as any;
@@ -317,24 +306,6 @@ function set_attributes(
 		for (const key in next) {
 			// let instead of var because referenced in a closure
 			let value = next[key];
-
-			// Up here because we want to do this for the initial value, too, even if it's undefined,
-			// and this wouldn't be reached in case of undefined because of the equality check below
-			if (is_option_element && key === 'value' && value == null) {
-				// The <option> element is a special case because removing the value attribute means
-				// the value is set to the text content of the option element, and setting the value
-				// to null or undefined means the value is set to the string "null" or "undefined".
-				// To align with how we handle this case in non-spread-scenarios, this logic is needed.
-				// There's a super-edge-case bug here that is left in favor of smaller code size:
-				// Because of the "set missing props to null" logic above, we can't differentiate
-				// between a missing value and an explicitly set value of null or undefined. That means
-				// that once set, the value attribute of an <option> element can't be removed. This is
-				// a very rare edge case, and removing the attribute altogether isn't possible either
-				// for the <option value={undefined}> case, so we're not losing any functionality here.
-				node.value = node.__value = '';
-				current[key] = value;
-				continue;
-			}
 
 			if (key === 'class') {
 				var is_html = element.namespaceURI === NAMESPACE_HTML;
@@ -409,8 +380,6 @@ function set_attributes(
 				) {
 					node.value = value ?? '';
 				}
-			} else if (key === 'selected' && is_option_element) {
-				set_selected(node, value);
 			} else {
 				var name = key;
 				if (!preserve_attribute_case) {
@@ -418,9 +387,6 @@ function set_attributes(
 				}
 
 				var is_default = name === 'defaultValue' || name === 'defaultChecked';
-
-				// A select's default value is represented by selected options, not a property.
-				if (is_select_element && name === 'defaultValue') continue;
 
 				if (value == null && !is_custom_element && !is_default) {
 					attributes[key] = null;
@@ -478,9 +444,6 @@ export function attribute_effect(
 	var prev: Attributes | undefined = undefined;
 	var effects: Record<symbol, Effect> = {};
 
-	var is_select = element.nodeName === SELECT_TAG;
-	var inited = false;
-
 	managed(() => {
 		var next = fn(...values.map(get));
 		var current = set_attributes(
@@ -491,18 +454,6 @@ export function attribute_effect(
 			should_remove_defaults,
 			skip_warning
 		);
-
-		if (inited && is_select) {
-			var select = element as HTMLSelectElement;
-
-			if ('defaultValue' in next) {
-				set_default_select_value(select, next.defaultValue);
-			}
-
-			if ('value' in next) {
-				select_option(select, next.value);
-			}
-		}
 
 		for (let symbol of Object.getOwnPropertySymbols(effects)) {
 			if (!next[symbol]) destroy_effect(effects[symbol]);
@@ -522,22 +473,6 @@ export function attribute_effect(
 		prev = current;
 	});
 
-	if (is_select) {
-		var select = element as HTMLSelectElement;
-
-		effect(() => {
-			var attrs = prev as Attributes;
-
-			if ('defaultValue' in attrs) {
-				set_default_select_value(select, attrs.defaultValue);
-			}
-
-			select_option(select, attrs.value, true);
-			init_select(select);
-		});
-	}
-
-	inited = true;
 }
 
 function get_attributes(element: Element): Attributes {
