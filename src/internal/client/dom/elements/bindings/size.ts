@@ -4,81 +4,60 @@ import { untrack } from '../../../runtime.ts';
 type Listener = (entry: ResizeObserverEntry) => unknown;
 
 /**
- * We create one listener for all elements
+ * We create one observer for all elements that are observed with the same `box`.
+ * This is a function and not a class, as it is in Svelte, because it minifies better.
+ * Returns the function that starts observing an element, which returns the one that stops it
  * @see {@link https://groups.google.com/a/chromium.org/g/blink-dev/c/z6ienONUb5A/m/F5-VcUZtBAAJ Explanation}
  */
-class ResizeObserverSingleton {
-	#listeners = new WeakMap<Element, Set<Listener>>();
+function resize_observer(box: ResizeObserverBoxOptions) {
+	var all = new WeakMap<Element, Set<Listener>>();
+	var observer: ResizeObserver | undefined;
 
-	#observer: ResizeObserver | undefined;
-
-	#options: ResizeObserverOptions;
-
-	static entries = new WeakMap<Element, ResizeObserverEntry>();
-
-	constructor(options: ResizeObserverOptions) {
-		this.#options = options;
-	}
-
-	observe(element: Element, listener: Listener): () => void {
-		var listeners = this.#listeners.get(element) || new Set();
+	return (element: Element, listener: Listener): (() => void) => {
+		var listeners = all.get(element) || new Set();
 		listeners.add(listener);
 
-		this.#listeners.set(element, listeners);
-		this.#getObserver().observe(element, this.#options);
+		all.set(element, listeners);
+
+		(observer ??= new ResizeObserver((entries) => {
+			for (var entry of entries) {
+				for (var listener of all.get(entry.target) || []) {
+					listener(entry);
+				}
+			}
+		})).observe(element, { box });
 
 		return () => {
-			var listeners = this.#listeners.get(element)!;
+			var listeners = all.get(element)!;
 			listeners.delete(listener);
 
 			if (listeners.size === 0) {
-				this.#listeners.delete(element);
-				this.#observer!.unobserve(element);
+				all.delete(element);
+				observer!.unobserve(element);
 			}
 		};
-	}
-
-	#getObserver(): ResizeObserver {
-		return (
-			this.#observer ??
-			(this.#observer = new ResizeObserver((entries) => {
-				for (var entry of entries) {
-					ResizeObserverSingleton.entries.set(entry.target, entry);
-					for (var listener of this.#listeners.get(entry.target) || []) {
-						listener(entry);
-					}
-				}
-			}))
-		);
-	}
+	};
 }
 
-var resize_observer_content_box = /* @__PURE__ */ new ResizeObserverSingleton({
-	box: 'content-box'
-});
+var observe_content_box = /* @__PURE__ */ resize_observer('content-box');
 
-var resize_observer_border_box = /* @__PURE__ */ new ResizeObserverSingleton({
-	box: 'border-box'
-});
+var observe_border_box = /* @__PURE__ */ resize_observer('border-box');
 
-var resize_observer_device_pixel_content_box = /* @__PURE__ */ new ResizeObserverSingleton({
-	box: 'device-pixel-content-box'
-});
+var observe_device_pixel_content_box = /* @__PURE__ */ resize_observer('device-pixel-content-box');
 
 export function bind_resize_observer(
 	element: Element,
 	type: 'contentRect' | 'contentBoxSize' | 'borderBoxSize' | 'devicePixelContentBoxSize',
 	set: (value: ResizeObserverEntry[typeof type]) => void
 ): void {
-	var observer =
+	var observe =
 		type === 'contentRect' || type === 'contentBoxSize'
-			? resize_observer_content_box
+			? observe_content_box
 			: type === 'borderBoxSize'
-				? resize_observer_border_box
-				: resize_observer_device_pixel_content_box;
+				? observe_border_box
+				: observe_device_pixel_content_box;
 
-	var unsub = observer.observe(element, (entry) => set(entry[type]));
-	teardown(unsub);
+	teardown(observe(element, (entry) => set(entry[type])));
 }
 
 export function bind_element_size(
@@ -86,7 +65,7 @@ export function bind_element_size(
 	type: 'clientWidth' | 'clientHeight' | 'offsetWidth' | 'offsetHeight',
 	set: (size: number) => void
 ): void {
-	var unsub = resize_observer_border_box.observe(element, () => set(element[type]));
+	var unsub = observe_border_box(element, () => set(element[type]));
 
 	effect(() => {
 		// The update could contain reads which should be ignored
