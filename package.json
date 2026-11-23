@@ -118,7 +118,8 @@
 		"upstream:update": "git submodule update --remote --depth 1 vendor/svelte && bun run upstream:sync-deps && bun run compat:audit --scaffold && bun test && bun run test:upstream",
 		"borrowed": "bun scripts/borrow.ts",
 		"scope": "bun scripts/scope.ts",
-		"size": "bun scripts/size.ts"
+		"size": "bun scripts/size.ts",
+		"test:prod": "bun scripts/test-prod.ts"
 	},
 	"devDependencies": {
 		"@jridgewell/remapping": "2.3.5",

@@ -27,6 +27,7 @@ for the browser tests.
 | --- | --- |
 | `bun run test` | The Svelte suite against svelte-lite |
 | `bun run test:upstream` | The same suite against Svelte itself, as a control and baseline |
+| `bun run test:prod` | Runs the samples of the main runtime suite as production bundles (`--minify` adds terser) |
 | `bun run test:types` | Svelte's type tests against svelte-lite, minus the parts that cover custom renderers (`SVELTE_IMPL=upstream` for the control) |
 | `bun test` | Unit tests of the harness |
 | `bun run check` | Type-checks this repo's own code |
@@ -54,6 +55,23 @@ with `SVELTE_IMPL=upstream` once to measure Svelte itself; after that, measuring
 shows the difference per app. `--all` covers about 140 apps that each add one feature to a
 counter, which shows what that feature costs when it is used.
 
+Gzipped, against Svelte 5.59.1:
+
+| App | svelte-lite | Svelte | |
+| --- | ---: | ---: | ---: |
+| A static page | 1,945 B | 12,037 B | −84% |
+| A counter | 2,921 B | 12,931 B | −77% |
+| The same, hydrated | 3,407 B | 13,653 B | −75% |
+| An element with spread attributes | 4,503 B | 16,547 B | −73% |
+| A keyed list | 5,593 B | 14,754 B | −62% |
+| A TodoMVC-style app, three components | 8,392 B | 18,196 B | −54% |
+| The same with a transition and an animation | 10,289 B | 20,050 B | −49% |
+
+The savings rely on the bundler dropping what an app does not use, which the test suite never
+exercises: it loads the modules one by one, with `DEV` on. `bun run test:prod` closes that gap.
+It builds each sample of the runtime-runes suite that can run that way as a production bundle
+and runs it in jsdom. `scripts/prod/skip.json` lists the samples that cannot, with the reason.
+
 ## What is left out
 
 `scope.json` names the features svelte-lite does not support and lists every test that fails
@@ -74,8 +92,12 @@ Using one of these fails with an error that says so, when compiling where that i
 
 ### Behaviour that differs from Svelte
 
-The synchronous scheduler gives up some edge cases of Svelte's. The first three have tests
-in the suite, which are out of scope for that reason:
+Besides leaving features out, svelte-lite gives up a number of niceties for size. Where the
+suite has a test for one, that test is out of scope under the reason given in `scope.json`.
+Each of these was made as a commit of its own, with the bytes it saved in the message, so
+that any one of them can be reverted.
+
+**Reactivity**
 
 - **Teardowns read current values.** An effect's cleanup, `onDestroy` and the cleanup of an
   action or attachment see state as it is now, not as it was before the change that caused
@@ -83,15 +105,59 @@ in the suite, which are out of scope for that reason:
 - **Blocks update when they re-run.** When an `$effect` writes to state that an `{#if}`,
   `{#each}` or similar depends on, the DOM changes right away. In Svelte it changes at the end
   of the flush, so effects later in the same flush still see the old DOM.
-- **An effect does not re-run because of its own write** to state that it only starts to
-  depend on during that same run.
+- An effect that writes to state and only afterwards reads it for the first time does not run
+  again because of that write. Reading and then writing re-runs it, as in Svelte.
 - `$state.eager(x)` is `x`, `$effect.pending()` is always `0`, and `settled()` is `tick()`.
-- In production builds, misuse (`state_unsafe_mutation`, `effect_orphan` and the like) is not
-  reported. It still is in dev.
 - If the expression of a `bind:this` throws while the binding is reset during teardown, the
   error is swallowed.
-- When a `bind:value` setter changes what was typed (`(v) => (text = v.toUpperCase())`), the
-  value is right but the caret moves to the end of the input. Svelte keeps it in place.
+
+**Events**
+
+- **Events are not delegated.** `onclick={...}` is a listener on its own element. Handlers
+  run in the browser's order, and there is one listener per element instead of one per root,
+  which matters in very long lists.
+- A handler written as an attribute runs before the listener of a `bind:` on the same element.
+  `<input bind:checked={on} onchange={() => use(on)}>` sees `on` as it was before the change.
+  Read `event.currentTarget.checked` instead.
+
+**Spread attributes**
+
+On an element with a spread (`{...attrs}`, `...rest` props), and on a `<svelte:element>` with
+dynamic attributes, attributes are applied without special cases. Elements without a spread
+are not affected by any of this.
+
+- `class` is a string. The object and array forms are not supported, and **`class:` directives
+  on that element are not applied**. The same goes for `style` and `style:` directives.
+- An attachment passed through the spread is not applied, which includes `{@attach}` on a
+  component that spreads its props onto an element. `{@attach}` on the element itself works.
+- On a `<select>`, `value` does not select options, also not for `bind:value` on that select.
+- `autofocus` does not focus the element. On an `<input>`, `type` is not set before `value`,
+  and a `value` or `checked` that becomes `undefined` does not reset the input.
+- Keys are used as written. `{...{ readonly: false }}` sets `readonly="false"`, which makes
+  the input read-only: write `readOnly: false`.
+
+**Bindings and actions**
+
+- Bound state does not follow `form.reset()`. Set it in an `onreset` handler.
+- A `bind:value` setter that refuses or changes what was typed is not written back to the
+  input right away. A setter that produces a new value (`(v) => (text = v.toUpperCase())`)
+  shows it, with the caret at the end of the input.
+- `use:action={param}` calls the action's `update` when the expression gives a different
+  value, not when the parameter is mutated in place.
+
+**Lists**
+
+- Reordering a keyed `{#each}` moves more elements than Svelte does. The resulting order is
+  the same. Moving the first of n items to the end moves the other n−1, where Svelte moves one.
+
+**Production builds**
+
+- Errors are thrown as `https://svelte.dev/e/<number>`. The table at the top of
+  `src/internal/client/errors.ts` gives the name for each number. Dev builds have the full
+  messages.
+- Misuse (`state_unsafe_mutation`, `effect_orphan` and the like) is only reported in dev.
+- There is no Trusted Types policy. A page whose CSP has `require-trusted-types-for 'script'`
+  needs a `default` policy of its own.
 - `hydratable()` and `fork()` fail with svelte-lite's own error instead of Svelte's. Both need
   `experimental.async` there too.
 
