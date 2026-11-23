@@ -1,7 +1,6 @@
 import type { ActionPayload } from '../../types.ts';
 import { effect, render_effect } from '../../reactivity/effects.ts';
-import { safe_not_equal } from '../../reactivity/equality.ts';
-import { deep_read_state, untrack } from '../../runtime.ts';
+import { untrack } from '../../runtime.ts';
 
 export function action<P>(
 	dom: Element,
@@ -17,13 +16,12 @@ export function action<P>(
 			var prev = {} as P;
 
 			render_effect(() => {
+				// Svelte also reads everything inside the value here, so that mutating a property
+				// of `$state` that was passed to the action counts as an update. That is left out:
+				// `update` is called when the expression itself gives another value
 				var value = get_value();
 
-				// Action's update method is coarse-grained, i.e. when anything in the passed value changes, update.
-				// With `$state` and mutation, it wouldn't notice the change without a deep read.
-				deep_read_state(value);
-
-				if (inited && safe_not_equal(prev, value)) {
+				if (inited && prev !== value) {
 					prev = value;
 					payload.update!(value);
 				}
