@@ -1,7 +1,7 @@
 import type { ComponentContext, DevStackEntry, Effect } from './types.ts';
 import { DEV } from 'esm-env';
 import { active_effect } from './runtime.ts';
-import { create_user_effect } from './reactivity/effects.ts';
+import { create_user_effect, has_effects } from './reactivity/effects.ts';
 import { FILENAME } from '../../constants.ts';
 import { COMPONENT_SYMBOL } from './constants.ts';
 import { define_property } from '../shared/utils.ts';
@@ -158,7 +158,8 @@ export function pop<T extends Record<string, any>>(component?: T): T {
 	var context = component_context as ComponentContext;
 	var effects = context.e;
 
-	if (effects !== null) {
+	// (`user_effect` is what puts them there)
+	if (has_effects && effects !== null) {
 		context.e = null;
 
 		for (var fn of effects) {

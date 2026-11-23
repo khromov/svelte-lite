@@ -10,6 +10,16 @@ type Adjustments = { message: string; stack: string | undefined } | undefined;
 
 const adjustments = new WeakMap<Error, Adjustments>();
 
+/**
+ * Whether the app has a `<svelte:boundary>`. Nothing but `boundary` sets this, so that a bundler
+ * can tell that an app without one never looks for it when an error is thrown
+ */
+export let has_boundaries = false;
+
+export function set_has_boundaries(): void {
+	has_boundaries = true;
+}
+
 export function handle_error(error: unknown): unknown {
 	var effect = active_effect;
 
@@ -46,23 +56,25 @@ export function invoke_error_boundary(error: unknown, effect: Effect | null): vo
 		return;
 	}
 
-	while (effect !== null) {
-		// Skip boundaries that are destroyed/destroying and cannot meaningfully handle the error.
-		if ((effect.f & BOUNDARY_EFFECT) !== 0 && (effect.f & (DESTROYED | DESTROYING)) === 0) {
-			if ((effect.f & REACTION_RAN) === 0) {
-				// we are still creating the boundary effect
-				throw error;
+	if (has_boundaries) {
+		while (effect !== null) {
+			// Skip boundaries that are destroyed/destroying and cannot meaningfully handle the error.
+			if ((effect.f & BOUNDARY_EFFECT) !== 0 && (effect.f & (DESTROYED | DESTROYING)) === 0) {
+				if ((effect.f & REACTION_RAN) === 0) {
+					// we are still creating the boundary effect
+					throw error;
+				}
+
+				try {
+					effect.b!.error!(error);
+					return;
+				} catch (e) {
+					error = e;
+				}
 			}
 
-			try {
-				effect.b!.error(error);
-				return;
-			} catch (e) {
-				error = e;
-			}
+			effect = effect.parent;
 		}
-
-		effect = effect.parent;
 	}
 
 	if (DEV && error instanceof Error) {

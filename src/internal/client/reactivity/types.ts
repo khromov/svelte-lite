@@ -6,7 +6,6 @@ import type {
 	TemplateNode,
 	TransitionManager
 } from '../types.ts';
-import type { Boundary } from '../dom/blocks/boundary.ts';
 
 export interface Signal {
 	/** Flags bitmask */
@@ -46,69 +45,13 @@ export interface Reaction extends Signal {
 	ctx: null | ComponentContext;
 	/** The reaction function */
 	fn: null | Function;
-	/** The ordered dependencies of the global run. Never modified in place: it can be shared with records and `edges` */
+	/** Signals that this signal reads from */
 	deps: null | Value[];
 	/**
-	 * The exact versions read by the global run, aligned with `deps`.
-	 * `null` if no such run exists or it was invalidated. Owned by the global run, which updates it in place
+	 * The controller of the signal that `getAbortSignal()` returned to the last run, if it was called.
+	 * It aborts once the reaction runs again or is destroyed. Only set by `getAbortSignal()`
 	 */
-	dv: null | number[];
-	/** Graph edges: a superset of the dependencies of every live run. Never modified in place, like `deps` */
-	edges: null | Value[];
-	/**
-	 * The AbortController of the signal of the global run, if any (see `getAbortSignal`). A record has its
-	 * own (`BatchRecord#ac`). It aborts once the run is replaced or dropped, or the reaction is destroyed
-	 */
-	ac: null | AbortController;
-}
-
-/**
- * A value of a signal and its version, as a batch holds it: a write in the batch (`Batch#current`),
- * the value from before the write (`Batch#previous`), or what a view of the world holds instead
- * of the real value (`batch_values`)
- */
-export interface BatchValue {
-	v: any;
-	wv: number;
-	/** Whether the value is an error */
-	e: boolean;
-	/**
-	 * For a derived: whether the value was assigned to it. Always the case for a write (`Batch#current`); the value
-	 * from before a write (`Batch#previous`) may have been computed instead
-	 */
-	assigned: boolean;
-	/**
-	 * Whether the value is the result of the batch's own run of an async expression or `{#await}` block.
-	 * Conceptually (if not mechanically) this is a derived, and so its value should
-	 * be determined by its inputs, and not those of an overlapping batch.
-	 * This matters when a batch commits and is prevented from overriding an earlier fork's result.
-	 */
-	async?: boolean;
-}
-
-/**
- * The result of a run of a reaction retained by a batch:
- * the values it read (in order) and their exact versions at the time — and, for
- * deriveds, the resulting value and its version (see `DerivedRecord`)
- */
-export interface BatchRecord {
-	deps: null | Value[];
-	dv: number[];
-	/** Set for deriveds, omitted for effects */
-	v?: any;
-	/** Set for deriveds, omitted for effects */
-	wv?: number;
-	/** Whether the value of a derived record is an error */
-	e?: boolean;
-	/** The AbortController of the run's signal, if any (see `getAbortSignal`) */
 	ac?: null | AbortController;
-}
-
-/** A record of a derived, which — unlike the record of an effect — has a value */
-export interface DerivedRecord extends BatchRecord {
-	v: any;
-	wv: number;
-	e: boolean;
 }
 
 export interface Derived<V = unknown> extends Value<V>, Reaction {
@@ -116,6 +59,8 @@ export interface Derived<V = unknown> extends Value<V>, Reaction {
 	fn: () => V;
 	/** Effects created inside this signal. Used to destroy those effects when the derived reruns or is cleaned up */
 	effects: null | Effect[];
+	/** The write version of the last write that the derived was marked for (see `mark_reactions`) */
+	mv: number;
 	/** Parent effect */
 	parent: Effect | null;
 }
@@ -127,6 +72,19 @@ export interface EffectNodes {
 	a: AnimationManager | null;
 	/** $.transition */
 	t: TransitionManager[] | null;
+}
+
+/**
+ * What an effect knows of the `<svelte:boundary>` whose content it is the root of
+ */
+export interface Boundary {
+	/**
+	 * Hands the boundary an error from inside it, which it throws if it has nothing to handle it with.
+	 * Missing on what `mount` puts at the root of an app, which only carries `transform_error`
+	 */
+	error?: (error: unknown) => void;
+	/** The `transformError` option of `mount` and `hydrate`, which applies to every boundary of the app */
+	transform_error?: (error: unknown) => unknown;
 }
 
 export interface Effect extends Reaction {
@@ -151,15 +109,11 @@ export interface Effect extends Reaction {
 	last: null | Effect;
 	/** Parent effect */
 	parent: Effect | null;
-	/** The boundary this effect belongs to */
-	b: Boundary | null;
 	/**
-	 * The renderer this effect was created with. Custom renderers are not supported, so there
-	 * never is one, and this would be `null`. It is `any` for as long as modules borrowed from
-	 * Svelte create effects: their effects are typed with Svelte's `Renderer | null`, and have
-	 * to be assignable to this type and back
+	 * The boundary whose content this effect is the root of, or what `mount` leaves
+	 * on the root effect for the boundaries of the app (see `Boundary`)
 	 */
-	r: any;
+	b?: Boundary;
 	/** Dev only */
 	component_function?: any;
 	/** Dev only. Only set for certain block effects. Contains a reference to the stack that represents the render tree */

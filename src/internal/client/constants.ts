@@ -49,20 +49,22 @@ export const EAGER_EFFECT = 1 << 17;
 export const HEAD_EFFECT = 1 << 18;
 export const EFFECT_PRESERVED = 1 << 19;
 export const USER_EFFECT = 1 << 20;
-export const EFFECT_OFFSCREEN = 1 << 25;
+/**
+ * An item of an each block that was created by a later run, until it is moved into place.
+ * (Svelte gives this the bit of `DESTROYING`. One is free here)
+ */
+export const EFFECT_OFFSCREEN = 1 << 26;
 
-// Flags used for async
+/** Set while a reaction is running */
 export const REACTION_IS_UPDATING = 1 << 21;
+/**
+ * The value or error of an `{#await}` block, which `$inspect.trace` reports as `$derived`.
+ * Only set in dev mode
+ */
 export const ASYNC = 1 << 22;
 
+/** The value of a derived is the error that its last run threw, which `get` throws again */
 export const ERROR_VALUE = 1 << 23;
-
-/** A run of the reaction asked for an abort signal (see `getAbortSignal`) */
-export const HAS_ABORT_CONTROLLER = 1 << 27;
-
-// Flags exclusive to deriveds
-/** The global state of the derived is a value that was assigned to it, rather than a run of it */
-export const ASSIGNED = 1 << 26;
 
 export const STATE_SYMBOL = Symbol('$state');
 /** Marks component export objects, so that `proxy(...)` leaves them untouched */

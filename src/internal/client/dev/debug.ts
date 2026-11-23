@@ -106,11 +106,11 @@ export function log_effect_tree(
 		console.groupEnd();
 	}
 
-	if (effect.edges !== null) {
+	if (effect.deps !== null) {
 		// eslint-disable-next-line no-console
 		console.groupCollapsed('%cdeps', 'font-weight: normal');
 
-		for (const dep of effect.edges) {
+		for (const dep of effect.deps) {
 			log_dep(dep);
 		}
 
@@ -152,8 +152,8 @@ function log_dep(dep: Value): void {
 			untrack(() => snapshot(derived.v))
 		);
 
-		if (derived.edges) {
-			for (const d of derived.edges) {
+		if (derived.deps) {
+			for (const d of derived.deps) {
 				log_dep(d);
 			}
 		}
@@ -423,10 +423,10 @@ export function log_inconsistent_branches(effect: Effect): true | undefined {
 			console.log('%cfn:', 'font-weight: bold', branch.effect.fn);
 		}
 
-		if (branch.effect.edges !== null) {
+		if (branch.effect.deps !== null) {
 			// eslint-disable-next-line no-console
 			console.groupCollapsed('%cdeps', 'font-weight: normal');
-			for (const dep of branch.effect.edges) {
+			for (const dep of branch.effect.deps) {
 				log_dep(dep);
 			}
 			// eslint-disable-next-line no-console

@@ -1,18 +1,15 @@
-import type { Effect, TemplateNode } from '../types.ts';
+import type { TemplateNode } from '../types.ts';
 import { DEV } from 'esm-env';
 import { NAMESPACE_HTML } from '../../../constants.ts';
 import { get_descriptor, is_extensible } from '../../shared/utils.ts';
 import {
 	ATTRIBUTES_CACHE,
 	CLASS_CACHE,
-	REACTION_RAN,
 	STYLE_CACHE,
 	TEXT_CACHE,
 	TEXT_NODE
 } from '../constants.ts';
 import { init_array_prototype_warnings } from '../dev/equality.ts';
-import { eager_block_writes } from '../reactivity/batch.ts';
-import { active_effect } from '../runtime.ts';
 import { hydrate_node, hydrating, reset, set_hydrate_node } from './hydration.ts';
 
 // export these for reference in the compiled code, making global name deduplication unnecessary
@@ -203,19 +200,6 @@ export function sibling(
 
 export function clear_text_content(node: Node): void {
 	node.textContent = '';
-}
-
-/**
- * Returns `true` if we're updating the current block, for example `condition` in
- * an `{#if condition}` block just changed, while block effects re-run eagerly because
- * of what an effect wrote (see `eager_block_writes`). In this case, the branch should
- * be appended (or removed) when the batch with those writes commits
- */
-export function should_defer_append(): boolean {
-	if (eager_block_writes === null) return false;
-
-	var flags = (active_effect as Effect).f;
-	return (flags & REACTION_RAN) !== 0;
 }
 
 /**

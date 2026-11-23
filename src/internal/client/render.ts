@@ -2,15 +2,20 @@ import type { Component, ComponentType, MountOptions, SvelteComponent } from '..
 import type { ComponentContext, Effect, EffectNodes, TemplateNode } from './types.ts';
 import { DEV } from 'esm-env';
 import { HYDRATION_END, HYDRATION_ERROR, HYDRATION_START } from '../../constants.ts';
-import { COMMENT_NODE, TEXT_CACHE } from './constants.ts';
+import { COMMENT_NODE, EFFECT_TRANSPARENT, TEXT_CACHE } from './constants.ts';
 import { component_context, mark_as_component, pop, push } from './context.ts';
-import { boundary } from './dom/blocks/boundary.ts';
 import { listen_to_delegated_events } from './dom/elements/events.ts';
-import { hydrate_node, hydrating, set_hydrate_node, set_hydrating } from './dom/hydration.ts';
+import {
+	hydrate_next,
+	hydrate_node,
+	hydrating,
+	set_hydrate_node,
+	set_hydrating
+} from './dom/hydration.ts';
 import { create_text, get_first_child, get_next_sibling } from './dom/operations.ts';
 import { assign_nodes } from './dom/template.ts';
 import * as e from './errors.ts';
-import { component_root } from './reactivity/effects.ts';
+import { branch, component_root, destroy_effect, pause_effect } from './reactivity/effects.ts';
 import { active_effect } from './runtime.ts';
 import * as w from './warnings.ts';
 
@@ -102,6 +107,7 @@ export function hydrate<
 
 		set_hydrating(true);
 		set_hydrate_node(anchor);
+		hydrate_next();
 
 		const instance = _mount<Exports>(component, { ...options, anchor } as Options);
 
@@ -142,49 +148,50 @@ function _mount<Exports extends Record<string, any>>(
 	// will be defined because the render effect runs synchronously
 	var component = undefined as unknown as Exports;
 
-	var unmount = component_root(() => {
+	var root = component_root(() => {
 		var anchor_node = anchor ?? target.appendChild(create_text());
 
-		boundary(
-			anchor_node as TemplateNode,
-			{
-				pending: () => {}
-			},
-			(anchor_node) => {
-				push({});
-				var ctx = component_context as ComponentContext;
-				if (context) ctx.c = context;
+		if (transformError) {
+			// a `<svelte:boundary>` takes this from the effect it is created in (see `boundary`)
+			(active_effect as Effect).b = { transform_error: transformError };
+		}
 
-				if (events) {
-					// We can't spread the object or else we'd lose the state proxy stuff, if it is one
-					props.$$events = events;
+		var effect = branch(() => {
+			push({});
+			var ctx = component_context as ComponentContext;
+			if (context) ctx.c = context;
+
+			if (events) {
+				// We can't spread the object or else we'd lose the state proxy stuff, if it is one
+				props.$$events = events;
+			}
+
+			if (hydrating) {
+				assign_nodes(anchor_node as TemplateNode, null);
+			}
+
+			should_intro = intro;
+			// the public typings are not what the actual function looks like
+			component = (Component as any)(anchor_node, props) || mark_as_component();
+			should_intro = true;
+
+			if (hydrating) {
+				(active_effect as Effect & { nodes: EffectNodes }).nodes.end = hydrate_node;
+
+				if (
+					hydrate_node?.nodeType !== COMMENT_NODE ||
+					hydrate_node.nodeValue !== HYDRATION_END
+				) {
+					w.hydration_mismatch();
+					throw HYDRATION_ERROR;
 				}
+			}
 
-				if (hydrating) {
-					assign_nodes(anchor_node as TemplateNode, null);
-				}
+			pop();
+		});
 
-				should_intro = intro;
-				// the public typings are not what the actual function looks like
-				component = (Component as any)(anchor_node, props) || mark_as_component();
-				should_intro = true;
-
-				if (hydrating) {
-					(active_effect as Effect & { nodes: EffectNodes }).nodes.end = hydrate_node;
-
-					if (
-						hydrate_node?.nodeType !== COMMENT_NODE ||
-						hydrate_node.nodeValue !== HYDRATION_END
-					) {
-						w.hydration_mismatch();
-						throw HYDRATION_ERROR;
-					}
-				}
-
-				pop();
-			},
-			transformError
-		);
+		// the transitions of the elements at the top of the component play when it is unmounted
+		effect.f |= EFFECT_TRANSPARENT;
 
 		// Setup event delegation _after_ component is mounted - if an error would happen during mount, it would otherwise not be cleaned up
 		var stop_listening = listen_to_delegated_events(target);
@@ -198,7 +205,7 @@ function _mount<Exports extends Record<string, any>>(
 		};
 	});
 
-	mounted_components.set(component, unmount);
+	mounted_components.set(component, root);
 	return component;
 }
 
@@ -206,10 +213,7 @@ function _mount<Exports extends Record<string, any>>(
  * References of the components that were mounted or hydrated.
  * Uses a `WeakMap` to avoid memory leaks.
  */
-let mounted_components = new WeakMap<
-	Record<string, any>,
-	(options?: { outro?: boolean }) => Promise<void>
->();
+let mounted_components = new WeakMap<Record<string, any>, Effect>();
 
 /**
  * Unmounts a component that was previously mounted using `mount` or `hydrate`.
@@ -232,11 +236,22 @@ export function unmount(
 	component: Record<string, any>,
 	options?: { outro?: boolean }
 ): Promise<void> {
-	const fn = mounted_components.get(component);
+	const root = mounted_components.get(component);
 
-	if (fn) {
+	if (root) {
 		mounted_components.delete(component);
-		return fn(options);
+
+		return new Promise((fulfil) => {
+			if (options?.outro) {
+				pause_effect(root, () => {
+					destroy_effect(root);
+					fulfil();
+				});
+			} else {
+				destroy_effect(root);
+				fulfil();
+			}
+		});
 	}
 
 	if (DEV) {

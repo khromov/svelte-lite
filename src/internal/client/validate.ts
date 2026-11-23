@@ -43,7 +43,7 @@ export function validate_binding(
 
 		ran = true;
 
-		if (effect.edges === null) {
+		if (effect.deps === null) {
 			var location = `${filename}:${line}:${column}`;
 			w.binding_property_non_reactive(binding, location);
 
