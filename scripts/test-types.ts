@@ -2,16 +2,26 @@
  * Type-checks upstream's tests/types, which exercise the public types of `svelte`,
  * against svelte-lite, or against Svelte itself with SVELTE_IMPL=upstream.
  *
+ * svelte-lite does not support custom renderers, so `svelte/renderer` has no types to
+ * test. What covers them is left out when checking svelte-lite: all of renderer.ts, and
+ * in the other tests the statements that use something imported from `svelte/renderer`.
+ *
  *   bun run test:types          counts per file and the most common errors
  *   bun run test:types --all    every error
  */
 import path from 'node:path';
 import ts from 'typescript';
 import { ROOT, UPSTREAM_PKG, UPSTREAM_TESTS, get_impl, is_inside } from '../harness/paths.ts';
-import { HarnessError, read_package } from '../harness/resolve.ts';
+import { HarnessError, is_reused, read_package } from '../harness/resolve.ts';
 
 const impl = get_impl();
 const types = path.join(UPSTREAM_TESTS, 'types');
+
+/** The entry point of custom renderers */
+const RENDERER = 'svelte/renderer';
+
+/** The test that covers nothing but custom renderers */
+const RENDERER_TEST = path.join(types, 'renderer.ts');
 
 const config = ts.getParsedCommandLineOfConfigFile(
 	path.join(types, 'tsconfig.json'),
@@ -23,6 +33,8 @@ const config = ts.getParsedCommandLineOfConfigFile(
 		}
 	}
 )!;
+
+let tests = config.fileNames;
 
 if (impl === 'lite') {
 	const paths: Record<string, string[]> = {};
@@ -37,26 +49,100 @@ if (impl === 'lite') {
 	config.options.baseUrl = ROOT;
 	config.options.rootDir = ROOT;
 	config.options.allowImportingTsExtensions = true;
+
+	tests = tests.filter((file) => path.resolve(file) !== RENDERER_TEST);
 }
 
-const program = ts.createProgram(config.fileNames, config.options);
+const program = ts.createProgram(tests, config.options);
 
 if (impl === 'lite') {
-	// anything that `paths` does not cover resolves to the upstream package, and
-	// the tests would then be checked against the types of real Svelte
+	// Anything that `paths` does not cover resolves to the upstream package, and the tests
+	// would then be checked against the types of real Svelte. The compiler and the server
+	// runtime are Svelte's, and their types with them. A module that is still borrowed is
+	// no exception: it brings the modules of Svelte that it imports, and their types.
 	const leaked = program
 		.getSourceFiles()
 		.map((file) => path.resolve(file.fileName))
-		.filter((file) => is_inside(file, UPSTREAM_PKG) && !is_inside(file, types));
+		.filter((file) => is_inside(file, UPSTREAM_PKG) && !is_inside(file, types) && !is_reused(file));
 
 	if (leaked.length > 0) {
+		const shown = leaked.slice(0, 10).map((file) => `\n  ${path.relative(ROOT, file)}`);
+		const more = leaked.length > shown.length ? `\n  … and ${leaked.length - shown.length} more` : '';
+
 		throw new HarnessError(
-			`Type tests picked up real Svelte: ${leaked.map((f) => path.relative(ROOT, f)).join(', ')}`
+			`Type tests picked up real Svelte, which only the compiler and the server runtime ` +
+				`may come from. \`bun run borrowed\` lists the modules that still re-export it.` +
+				shown.join('') +
+				more
 		);
 	}
 }
 
-const diagnostics = ts.getPreEmitDiagnostics(program);
+/**
+ * The top-level statements of a test that use something imported from `svelte/renderer`,
+ * directly or through something that such a statement declares
+ */
+function renderer_statements(file: ts.SourceFile) {
+	const names = new Set<string>();
+
+	const uses = (node: ts.Node): boolean =>
+		(ts.isIdentifier(node) && names.has(node.text)) || !!ts.forEachChild(node, uses);
+
+	return file.statements.filter((statement) => {
+		if (ts.isImportDeclaration(statement)) {
+			const from = statement.moduleSpecifier;
+			if (!ts.isStringLiteral(from) || from.text !== RENDERER) return false;
+
+			const clause = statement.importClause;
+			const bindings = clause?.namedBindings;
+
+			if (clause?.name) names.add(clause.name.text);
+			if (bindings && ts.isNamespaceImport(bindings)) names.add(bindings.name.text);
+			if (bindings && ts.isNamedImports(bindings)) {
+				for (const { name } of bindings.elements) names.add(name.text);
+			}
+
+			return true;
+		}
+
+		if (!uses(statement)) return false;
+
+		if (ts.isVariableStatement(statement)) {
+			for (const { name } of statement.declarationList.declarations) {
+				if (ts.isIdentifier(name)) names.add(name.text);
+			}
+		} else if (
+			(ts.isFunctionDeclaration(statement) ||
+				ts.isClassDeclaration(statement) ||
+				ts.isInterfaceDeclaration(statement) ||
+				ts.isTypeAliasDeclaration(statement)) &&
+			statement.name
+		) {
+			names.add(statement.name.text);
+		}
+
+		return true;
+	});
+}
+
+const statements = new Map<ts.SourceFile, ts.Statement[]>();
+
+/** Whether an error is in a part of a test that covers custom renderers */
+function covers_renderers({ file, start }: ts.Diagnostic) {
+	if (impl !== 'lite' || !file || start === undefined || !is_inside(path.resolve(file.fileName), types)) {
+		return false;
+	}
+
+	if (!statements.has(file)) statements.set(file, renderer_statements(file));
+
+	// the comments in front of a statement are part of it, a `@ts-expect-error` that
+	// no longer has an error to expect is reported there
+	return statements.get(file)!.some((s) => start >= s.getFullStart() && start < s.end);
+}
+
+const found = ts.getPreEmitDiagnostics(program);
+const unsupported = found.filter(covers_renderers);
+const diagnostics = found.filter((d) => !unsupported.includes(d));
 const text = (d: ts.Diagnostic) => ts.flattenDiagnosticMessageText(d.messageText, ' ');
 
 if (process.argv.includes('--all')) {
@@ -86,7 +172,13 @@ if (process.argv.includes('--all')) {
 	console.log();
 }
 
-const checked = config.fileNames.length;
-console.log(`${impl}: ${diagnostics.length} type errors in the ${checked} files of tests/types`);
+console.log(`${impl}: ${diagnostics.length} type errors in the ${tests.length} files of tests/types`);
+
+if (impl === 'lite') {
+	console.log(
+		`Left out, as custom renderers are not supported: ${path.basename(RENDERER_TEST)}, and ` +
+			`${unsupported.length} errors in statements that use ${RENDERER}`
+	);
+}
 
 process.exit(diagnostics.length > 0 ? 1 : 0);

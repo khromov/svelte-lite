@@ -7,6 +7,7 @@
 	"license": "MIT",
 	"exports": {
 		".": {
+			"types": "./src/index.ts",
 			"svelte-custom-renderer": "./src/index-client.ts",
 			"worker": "./src/index-server.ts",
 			"browser": "./src/index-client.ts",
@@ -17,9 +18,11 @@
 			"types": "./src/action/public.ts"
 		},
 		"./animate": {
+			"types": "./src/animate/public.ts",
 			"default": "./src/animate/index.ts"
 		},
 		"./attachments": {
+			"types": "./src/attachments/public.ts",
 			"default": "./src/attachments/index.ts"
 		},
 		"./compiler": {
@@ -68,6 +71,7 @@
 			"default": "./src/legacy/legacy-server.ts"
 		},
 		"./motion": {
+			"types": "./src/motion/public.ts",
 			"default": "./src/motion/index.ts"
 		},
 		"./reactivity": {
@@ -88,15 +92,18 @@
 			"default": "./src/server/index.ts"
 		},
 		"./store": {
+			"types": "./src/store/public.ts",
 			"svelte-custom-renderer": "./src/store/index-client.ts",
 			"worker": "./src/store/index-server.ts",
 			"browser": "./src/store/index-client.ts",
 			"default": "./src/store/index-server.ts"
 		},
 		"./transition": {
+			"types": "./src/transition/public.ts",
 			"default": "./src/transition/index.ts"
 		},
 		"./events": {
+			"types": "./src/events/public.ts",
 			"default": "./src/events/index.ts"
 		}
 	},

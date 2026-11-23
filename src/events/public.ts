@@ -1,2 +1,3 @@
-// @borrowed from Svelte until svelte-lite has its own version of this module
-export type * from '../../vendor/svelte/packages/svelte/src/events/public.d.ts';
+// Svelte declares the overloads of `on` here, because JSDoc cannot express them. In
+// svelte-lite they are part of the implementation, which makes that the only declaration.
+export { on } from './index.ts';
