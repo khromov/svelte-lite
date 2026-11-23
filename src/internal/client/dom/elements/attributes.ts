@@ -21,7 +21,7 @@ import { hydrating, set_hydrating } from '../hydration.ts';
 import { set_attribute as set_attribute_op } from '../operations.ts';
 import { queue_micro_task } from '../task.ts';
 import { create_event } from './events.ts';
-import { add_form_reset_listener, autofocus } from './misc.ts';
+import { add_form_reset_listener } from './misc.ts';
 
 /**
  * What a spread is given: attributes by name, plus `CLASS`, `STYLE` and attachments
@@ -34,11 +34,9 @@ export const CLASS = Symbol('class');
 /** The key the compiler puts the `style:` directives of an element with a spread under */
 export const STYLE = Symbol('style');
 
-const IS_CUSTOM_ELEMENT = Symbol('is custom element');
 const IS_HTML = Symbol('is html');
 
 const LINK_TAG = IS_XHTML ? 'link' : 'LINK';
-const INPUT_TAG = IS_XHTML ? 'input' : 'INPUT';
 const PROGRESS_TAG = IS_XHTML ? 'progress' : 'PROGRESS';
 
 /**
@@ -234,7 +232,10 @@ export function set_custom_element_data(node: HTMLElement, prop: string, value: 
 }
 
 /**
- * Spreads attributes onto a DOM element, taking into account the currently set attributes
+ * Spreads attributes onto a DOM element, taking into account the currently set attributes.
+ * A key is an event handler (`on...`), a property (if the element has a setter for it and the
+ * value is not a string) or an attribute, and `null` or `undefined` removes the attribute.
+ * No element is treated differently from another, and of the keys only `style` and `value` are
  * @param next New attributes - this function mutates this object
  */
 function set_attributes(
@@ -242,164 +243,98 @@ function set_attributes(
 	prev: Attributes | undefined,
 	next: Attributes,
 	css_hash?: string,
-	should_remove_defaults = false,
 	skip_warning = false
 ): Attributes {
-	if (hydrating && should_remove_defaults && element.nodeName === INPUT_TAG) {
-		if (!('defaultValue' in next || 'defaultChecked' in next)) {
-			remove_input_defaults(element as HTMLInputElement);
-		}
-	}
-
 	var attributes = get_attributes(element);
-
-	var is_custom_element = attributes[IS_CUSTOM_ELEMENT];
-	var preserve_attribute_case = !attributes[IS_HTML];
-
-	// If we're hydrating but the custom element is from Svelte, and it already scaffolded,
-	// then it might run block logic in hydration mode, which we have to prevent.
-	let is_hydrating_custom_element = hydrating && is_custom_element;
-	if (is_hydrating_custom_element) {
-		set_hydrating(false);
-	}
-
 	var current = prev || {};
 
-	// the properties that only some elements have, and the internal `__value`
-	var node = element as any;
+	for (var key in prev) {
+		// don't null our internal $$onX listeners
+		if (!(key in next) && key[0] + key[1] !== '$$') {
+			next[key] = null;
+		}
+	}
 
-	try {
-		for (var key in prev) {
-			// don't null our internal $$onX listeners
-			if (!(key in next) && key[0] + key[1] !== '$$') {
-				next[key] = null;
-			}
+	if (css_hash) {
+		// `class` is a string like any other attribute here (and so is `style`), with the hash
+		// that scopes the component's styles added to it. Objects, arrays and `class:` directives
+		// are not applied
+		next.class = next.class ? next.class + ' ' + css_hash : css_hash;
+	}
+
+	var setters = get_setters(element);
+
+	// since key is captured we use const
+	for (const key in next) {
+		// let instead of var because referenced in a closure
+		let value = next[key];
+
+		var prev_value = current[key];
+
+		// Skip if value is unchanged, unless it's `undefined` and the element still has the attribute
+		if (value === prev_value && !(value === undefined && element.hasAttribute(key))) {
+			continue;
 		}
 
-		if (css_hash) {
-			// `class` is a string like any other attribute here (and so is `style`), with the hash
-			// that scopes the component's styles added to it. Objects, arrays and `class:` directives
-			// are not applied
-			next.class = next.class ? next.class + ' ' + css_hash : css_hash;
-		}
+		current[key] = value;
 
-		var setters = get_setters(element);
+		var prefix = key[0] + key[1]; // this is faster than key.slice(0, 2)
+		if (prefix === '$$') continue;
 
-		if (element.nodeName === INPUT_TAG && 'type' in next && ('value' in next || '__value' in next)) {
-			var type = next.type;
+		if (prefix === 'on') {
+			const opts: { capture?: true } = {};
+			const event_handle_key = '$$' + key;
+			let event_name = key.slice(2);
 
-			if (type !== current.type || (type === undefined && element.hasAttribute('type'))) {
-				current.type = type;
-				set_attribute(element, 'type', type, skip_warning);
-			}
-		}
-
-		// since key is captured we use const
-		for (const key in next) {
-			// let instead of var because referenced in a closure
-			let value = next[key];
-
-			var prev_value = current[key];
-
-			// Skip if value is unchanged, unless it's `undefined` and the element still has the attribute
-			if (value === prev_value && !(value === undefined && element.hasAttribute(key))) {
-				continue;
+			if (is_capture_event(event_name)) {
+				event_name = event_name.slice(0, -7);
+				opts.capture = true;
 			}
 
-			current[key] = value;
+			if (prev_value) {
+				// Listening to same event but different handler -> our handle function below takes care of this
+				// If we were to remove and add listeners in this case, it could happen that the event is "swallowed"
+				// (the browser seems to not know yet that a new one exists now) and doesn't reach the handler
+				// https://github.com/sveltejs/svelte/issues/11903
+				if (value != null) continue;
 
-			var prefix = key[0] + key[1]; // this is faster than key.slice(0, 2)
-			if (prefix === '$$') continue;
+				element.removeEventListener(event_name, current[event_handle_key], opts);
+				current[event_handle_key] = null;
+			}
 
-			if (prefix === 'on') {
-				const opts: { capture?: true } = {};
-				const event_handle_key = '$$' + key;
-				let event_name = key.slice(2);
-
-				if (is_capture_event(event_name)) {
-					event_name = event_name.slice(0, -7);
-					opts.capture = true;
+			if (value != null) {
+				function handle(this: any, ...args: any[]) {
+					current[key].apply(this, args);
 				}
 
-				if (prev_value) {
-					// Listening to same event but different handler -> our handle function below takes care of this
-					// If we were to remove and add listeners in this case, it could happen that the event is "swallowed"
-					// (the browser seems to not know yet that a new one exists now) and doesn't reach the handler
-					// https://github.com/sveltejs/svelte/issues/11903
-					if (value != null) continue;
+				current[event_handle_key] = create_event(event_name, element, handle, opts);
+			}
+		} else {
+			var name = key;
+			if (attributes[IS_HTML]) {
+				name = normalize_attribute(name);
+			}
 
-					element.removeEventListener(event_name, current[event_handle_key], opts);
-					current[event_handle_key] = null;
-				}
-
-				if (value != null) {
-					function handle(this: any, ...args: any[]) {
-						current[key].apply(this, args);
-					}
-
-					current[event_handle_key] = create_event(event_name, element, handle, opts);
-				}
-			} else if (key === 'autofocus') {
-				autofocus(node, Boolean(value));
-			} else if (!is_custom_element && (key === '__value' || (key === 'value' && value != null))) {
-				// We're not running this for custom elements because __value is actually
-				// how Lit stores the current value on the element, and messing with that would break things.
-				node.__value = value;
-				// we don't set the value if it hasn't changed. This supports invalid number inputs like `1e` because
-				// 1. user types 1e
-				// 2. the state is updated reading e.target.value which is ''
-				// 3. the spreaded value is ''
-				// 4. updating input.value would thus, clear the user value
-				if (
-					prev_value == null ||
-					node.value !== value ||
-					(value === 0 && element.nodeName === PROGRESS_TAG)
-				) {
-					node.value = value ?? '';
-				}
-			} else {
-				var name = key;
-				if (!preserve_attribute_case) {
-					name = normalize_attribute(name);
-				}
-
-				var is_default = name === 'defaultValue' || name === 'defaultChecked';
-
-				if (value == null && (!is_custom_element || key === 'style') && !is_default) {
-					attributes[key] = null;
-
-					if (name === 'value') {
-						// removing value/checked also removes defaultValue/defaultChecked — preserve
-						let default_value = node.defaultValue;
-						element.removeAttribute(name);
-						set_default_value(node, default_value);
-						node.value = (node.__value = prev === undefined ? default_value : null) ?? '';
-					} else if (name === 'checked') {
-						let default_checked = node.defaultChecked;
-						element.removeAttribute(name);
-						set_default_checked(node, default_checked);
-						node.checked = prev === undefined ? default_checked : false;
-					} else {
-						element.removeAttribute(key);
-					}
-				} else if (
-					is_default ||
-					// `style` goes through its setter, as a string: a content security policy
-					// can forbid the attribute
-					((is_custom_element || typeof value !== 'string' || key === 'style') &&
-						setters.has(name))
-				) {
-					node[name] = value;
+			if (value == null) {
+				attributes[key] = null;
+				element.removeAttribute(key);
+			} else if (
+				// `style` goes through its setter also as a string, because a content security
+				// policy can forbid the attribute. So does `value`, because the attribute of an
+				// input is only where it starts
+				(typeof value !== 'string' || key === 'style' || key === 'value') &&
+				setters.has(name)
+			) {
+				// a string that the element has as its `value` already is not assigned again:
+				// `1e` typed into a number input reads as '', and assigning '' would clear it
+				if (key !== 'value' || (element as any).value !== value || typeof value !== 'string') {
+					(element as any)[name] = value;
 					// remove it from attributes's cache
 					if (name in attributes) attributes[name] = UNINITIALIZED;
-				} else if (typeof value !== 'function') {
-					set_attribute(element, name, value, skip_warning);
 				}
+			} else if (typeof value !== 'function') {
+				set_attribute(element, name, value, skip_warning);
 			}
-		}
-	} finally {
-		if (is_hydrating_custom_element) {
-			set_hydrating(true);
 		}
 	}
 
@@ -408,7 +343,8 @@ function set_attributes(
 
 /**
  * `async` and `blockers` only have content with `experimental.async`, which svelte-lite leaves
- * out. They are in the signature because the compiler passes the arguments after them by position.
+ * out, and `should_remove_defaults` asks for something a spread does not do here. They are in
+ * the signature because the compiler passes the arguments after them by position.
  */
 export function attribute_effect(
 	element: Element & ElementCSSInlineStyle,
@@ -417,27 +353,19 @@ export function attribute_effect(
 	async?: unknown,
 	blockers?: unknown,
 	css_hash?: string,
-	should_remove_defaults = false,
+	should_remove_defaults?: boolean,
 	skip_warning = false
 ): void {
 	var values = expressions(sync);
 	var prev: Attributes | undefined = undefined;
 
 	managed(() => {
-		prev = set_attributes(
-			element,
-			prev,
-			fn(...values.map(get)),
-			css_hash,
-			should_remove_defaults,
-			skip_warning
-		);
+		prev = set_attributes(element, prev, fn(...values.map(get)), css_hash, skip_warning);
 	});
 }
 
 function get_attributes(element: Element): Attributes {
 	return ((element as any)[ATTRIBUTES_CACHE] ??= {
-		[IS_CUSTOM_ELEMENT]: element.nodeName.includes('-'),
 		[IS_HTML]: element.namespaceURI === NAMESPACE_HTML
 	});
 }
