@@ -13,13 +13,10 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
-import { transform } from 'esbuild';
-import { rollup, type Plugin } from 'rollup';
-import { minify } from 'terser';
-import { RESULTS, ROOT, UPSTREAM_PKG, get_impl } from '../harness/paths.ts';
-import { create_resolver } from '../harness/resolve.ts';
+import type { Plugin } from 'rollup';
+import { RESULTS, UPSTREAM_PKG, get_impl } from '../harness/paths.ts';
+import { bundle, minify, production } from './prod/bundle.ts';
 // plain data modules, taken over from the size study of Svelte
 import features from './size/features.mjs';
 import realistic from './size/realistic.mjs';
@@ -51,7 +48,7 @@ const HEADLINE = [
 const DEFAULT_ENTRY = `import { mount } from 'svelte'; import App from './App.svelte'; mount(App, { target: document.body });`;
 
 const impl = get_impl();
-const { resolve, upstream_pkg } = create_resolver(impl);
+const runtime = production(impl);
 
 const { compile, compileModule } = await import(
 	impl === 'lite' ? '../src/compiler/index.ts' : path.join(UPSTREAM_PKG, 'src/compiler/index.js')
@@ -60,7 +57,8 @@ const { compile, compileModule } = await import(
 /** The app's own files live here, as far as the bundler is concerned */
 const APP = '/__app__/';
 
-function bundler(scenario: Scenario): Plugin {
+/** Compiles the files of a scenario and serves them to the bundler */
+function app(scenario: Scenario): Plugin {
 	const files = new Map<string, string>([[`${APP}entry.js`, scenario.entry ?? DEFAULT_ENTRY]]);
 
 	for (const [name, source] of Object.entries(scenario.files)) {
@@ -80,60 +78,22 @@ function bundler(scenario: Scenario): Plugin {
 		resolveId(id, importer) {
 			if (id === `${APP}entry.js`) return id;
 
-			// a production build for the browser
-			if (id === 'esm-env') return '\0esm-env';
-
 			if (importer?.startsWith(APP) && id.startsWith('.')) {
 				return path.resolve(path.dirname(importer), id);
 			}
 
-			const resolved = resolve(id, importer);
-			if (resolved) return resolved;
-
-			if (id.startsWith('#')) {
-				const entry = upstream_pkg.imports?.[id];
-				const target = typeof entry === 'string' ? entry : entry?.default;
-				return target ? path.resolve(UPSTREAM_PKG, target) : null;
-			}
-
-			if (id.startsWith('.')) return path.resolve(path.dirname(importer!), id);
-
-			return fileURLToPath(import.meta.resolve(id));
+			return null;
 		},
 
 		load(id) {
-			if (id === '\0esm-env') {
-				return 'export const DEV = false; export const BROWSER = true; export const NODE = false;';
-			}
-
 			return files.get(id) ?? null;
-		},
-
-		async transform(code, id) {
-			if (!id.endsWith('.ts')) return null;
-			return (await transform(code, { loader: 'ts', target: 'esnext' })).code;
 		}
 	};
 }
 
 async function measure(scenario: Scenario): Promise<Size> {
-	const bundle = await rollup({
-		input: `${APP}entry.js`,
-		plugins: [bundler(scenario)],
-		onwarn() {}
-	});
-
-	const { output } = await bundle.generate({ format: 'es' });
-	await bundle.close();
-
-	const minified = await minify(output[0].code, {
-		module: true,
-		toplevel: true,
-		compress: { passes: 2 },
-		mangle: true
-	});
-
-	const code = minified.code ?? '';
+	const { chunk } = await bundle(`${APP}entry.js`, [app(scenario), runtime]);
+	const code = await minify(chunk.code);
 
 	return {
 		min: Buffer.byteLength(code),
