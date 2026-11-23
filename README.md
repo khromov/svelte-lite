@@ -59,13 +59,17 @@ Gzipped, against Svelte 5.59.1:
 
 | App | svelte-lite | Svelte | |
 | --- | ---: | ---: | ---: |
-| A static page | 1,945 B | 12,037 B | −84% |
-| A counter | 2,921 B | 12,931 B | −77% |
-| The same, hydrated | 3,407 B | 13,653 B | −75% |
-| An element with spread attributes | 4,503 B | 16,547 B | −73% |
-| A keyed list | 5,593 B | 14,754 B | −62% |
-| A TodoMVC-style app, three components | 8,392 B | 18,196 B | −54% |
-| The same with a transition and an animation | 10,289 B | 20,050 B | −49% |
+| A static page | 1,918 B | 12,037 B | −84% |
+| A counter | 2,900 B | 12,931 B | −78% |
+| The same, hydrated | 3,384 B | 13,653 B | −75% |
+| An element with spread attributes | 4,481 B | 16,547 B | −73% |
+| A keyed list | 5,333 B | 14,754 B | −64% |
+| A TodoMVC-style app, three components | 7,993 B | 18,196 B | −56% |
+| The same with a transition and an animation | 10,324 B | 20,050 B | −49% |
+
+Transitions and animations are the clearest case of paying only for what is used: their
+plumbing in effects and `{#each}` is behind two flags that only `transition()` and
+`animation()` set, so an app without either carries none of it.
 
 The savings rely on the bundler dropping what an app does not use, which the test suite never
 exercises: it loads the modules one by one, with `DEV` on. `bun run test:prod` closes that gap.
