@@ -1,2 +1,7 @@
-// @borrowed from Svelte until svelte-lite has its own version of this module
-export * from '../../../../../../vendor/svelte/packages/svelte/src/internal/client/dom/elements/bindings/navigator.js';
+import { listen } from './shared.ts';
+
+export function bind_online(update: (online: boolean) => void): void {
+	listen(window, ['online', 'offline'], () => {
+		update(navigator.onLine);
+	});
+}
