@@ -8,7 +8,7 @@ import type {
 	TransitionManager
 } from '../../types.ts';
 import { noop, is_function } from '../../../shared/utils.ts';
-import { effect } from '../../reactivity/effects.ts';
+import { effect, set_has_transitions } from '../../reactivity/effects.ts';
 import { active_effect, untrack } from '../../runtime.ts';
 import { loop } from '../../loop.ts';
 import { should_intro } from '../../render.ts';
@@ -190,6 +190,8 @@ export function transition<P>(
 	get_fn: () => TransitionFn<P | undefined>,
 	get_params: (() => P) | null
 ): void {
+	set_has_transitions();
+
 	var is_intro = (flags & TRANSITION_IN) !== 0;
 	var is_outro = (flags & TRANSITION_OUT) !== 0;
 	var is_both = is_intro && is_outro;
