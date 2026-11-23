@@ -533,10 +533,11 @@ export function get<V>(signal: Value<V>): V {
 			unfreeze_derived_effects(derived);
 			reconnect(derived);
 		}
-	}
 
-	if ((signal.f & ERROR_VALUE) !== 0) {
-		throw signal.v;
+		// (only the value of a derived can be an error, see `update_reaction`)
+		if ((derived.f & ERROR_VALUE) !== 0) {
+			throw derived.v;
+		}
 	}
 
 	return signal.v;
