@@ -11,6 +11,12 @@ import * as w from '../../../warnings.ts';
 type Select = HTMLSelectElement & { __value?: unknown; __defaultValue?: unknown };
 
 /**
+ * Whether any `<select>` was given a `defaultValue`. Only `set_default_select_value` does that,
+ * so in an app that never calls it, a bundler drops what `init_select` does for defaults
+ */
+let has_default_values = false;
+
+/**
  * Sets the `selected` attribute on an option so form reset can restore it.
  */
 export function set_selected(option: HTMLOptionElement, selected: boolean): void {
@@ -32,6 +38,7 @@ export function set_selected(option: HTMLOptionElement, selected: boolean): void
 export function set_default_select_value(select: Select, value: any): void {
 	var mounting = !('__defaultValue' in select);
 	if (!mounting && select.__defaultValue === value) return;
+	has_default_values = true;
 	select.__defaultValue = value;
 	apply_default_select_value(select, !mounting || '__value' in select);
 }
@@ -124,7 +131,7 @@ export function init_select(select: Select): void {
 		// handler), which can happen before the `change` handler has updated `__value`
 		if (entries.every(is_selectedcontent_mutation)) return;
 
-		if ('__defaultValue' in select) {
+		if (has_default_values && '__defaultValue' in select) {
 			apply_default_select_value(select, false);
 		}
 
