@@ -1,5 +1,5 @@
 import { effect, teardown } from '../../../reactivity/effects.ts';
-import { listen_to_event } from './shared.ts';
+import { listen_to_event_and_reset_event } from './shared.ts';
 import { is } from '../../../proxy.ts';
 import { is_array } from '../../../../shared/utils.ts';
 import * as w from '../../../warnings.ts';
@@ -165,14 +165,15 @@ export function bind_select_value(
 ): void {
 	var mounting = true;
 
-	listen_to_event(select, 'change', () => {
+	listen_to_event_and_reset_event(select, 'change', (is_reset) => {
+		var query = is_reset ? '[selected]' : ':checked';
 		var value: unknown;
 
 		if (select.multiple) {
-			value = Array.from(select.querySelectorAll<HTMLOptionElement>(':checked'), get_option_value);
+			value = Array.from(select.querySelectorAll<HTMLOptionElement>(query), get_option_value);
 		} else {
 			var selected_option: HTMLOptionElement | null =
-				select.querySelector(':checked') ??
+				select.querySelector(query) ??
 				// will fall back to first non-disabled option if no option is selected
 				select.querySelector('option:not([disabled])');
 			value = selected_option && get_option_value(selected_option);

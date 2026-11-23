@@ -5,6 +5,8 @@ import {
 	set_active_effect,
 	set_active_reaction
 } from '../../../runtime.ts';
+import { FORM_RESET_HANDLER } from '../../../constants.ts';
+import { add_form_reset_listener } from '../misc.ts';
 
 /**
  * Fires the handler once immediately (unless corresponding arg is set to `false`),
@@ -45,10 +47,29 @@ export function without_reactive_context<T>(fn: () => T): T {
 }
 
 /**
- * Listen to the given event for as long as the element lives. Svelte also notifies the
- * binding when the element's form is reset, which is left out: after `form.reset()` the
- * bound state keeps its value until the next event from the element
+ * Listen to the given event, and then instantiate a global form reset listener if not already done,
+ * to notify all bindings when the form is reset.
+ *
+ * Svelte takes a second handler for the reset from the bindings that need one. Here the one
+ * handler of a binding does both: it is called with `true` for a reset, a tick after the
+ * event, when the elements of the form have their defaults again. No reaction is running
+ * then, which an event that is dispatched from an effect cannot be sure of
  */
-export function listen_to_event(element: HTMLElement, event: string, handler: () => void): void {
+export function listen_to_event_and_reset_event(
+	element: HTMLElement & { [FORM_RESET_HANDLER]?: () => void },
+	event: string,
+	handler: (is_reset?: true) => void
+): void {
 	element.addEventListener(event, () => without_reactive_context(handler));
+
+	// The element has a reset handler already if it is a checkbox with both `bind:group` and
+	// `bind:checked`, or an input that `remove_input_defaults` looks after while hydrating
+	var prev = element[FORM_RESET_HANDLER];
+
+	element[FORM_RESET_HANDLER] = () => {
+		prev?.();
+		handler(true);
+	};
+
+	add_form_reset_listener();
 }
