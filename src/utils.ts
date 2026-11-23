@@ -143,29 +143,31 @@ export function is_boolean_attribute(name: string) {
 }
 
 /**
- * List of attribute names that should be aliased to their property names
- * because they behave differently between setting them as an attribute and
- * setting them as a property.
+ * The properties that an attribute name should be aliased to, because they behave
+ * differently between setting them as an attribute and setting them as a property.
+ * An attribute is the name of its property in lower case, so the properties are all
+ * there is to list: this is in every app with a spread, where Svelte's table of both
+ * costs 56 B more (gzip)
  */
-const ATTRIBUTE_ALIASES: Record<string, string> = {
-	// no `class: 'className'` because we handle that separately
-	formnovalidate: 'formNoValidate',
-	ismap: 'isMap',
-	nomodule: 'noModule',
-	playsinline: 'playsInline',
-	readonly: 'readOnly',
-	defaultvalue: 'defaultValue',
-	defaultchecked: 'defaultChecked',
-	srcobject: 'srcObject',
-	novalidate: 'noValidate',
-	allowfullscreen: 'allowFullscreen',
-	disablepictureinpicture: 'disablePictureInPicture',
-	disableremoteplayback: 'disableRemotePlayback'
-};
+const ATTRIBUTE_ALIASES = [
+	// no `className` because we handle that separately
+	'formNoValidate',
+	'isMap',
+	'noModule',
+	'playsInline',
+	'readOnly',
+	'defaultValue',
+	'defaultChecked',
+	'srcObject',
+	'noValidate',
+	'allowFullscreen',
+	'disablePictureInPicture',
+	'disableRemotePlayback'
+];
 
 export function normalize_attribute(name: string) {
 	name = name.toLowerCase();
-	return ATTRIBUTE_ALIASES[name] ?? name;
+	return ATTRIBUTE_ALIASES.find((alias) => alias.toLowerCase() === name) ?? name;
 }
 
 const DOM_PROPERTIES = [

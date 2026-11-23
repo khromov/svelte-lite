@@ -1,7 +1,7 @@
 import { DEV } from 'esm-env';
 import type { Effect } from '../../types.ts';
 import { ATTACHMENT_KEY, NAMESPACE_HTML, UNINITIALIZED } from '../../../../constants.ts';
-import { is_capture_event } from '../../../../utils.ts';
+import { is_capture_event, normalize_attribute } from '../../../../utils.ts';
 import { clsx, to_class } from '../../../shared/attributes.ts';
 import { get_descriptors, get_prototype_of } from '../../../shared/utils.ts';
 import {
@@ -254,7 +254,9 @@ export function set_custom_element_data(node: HTMLElement, prop: string, value: 
  * `value` are. `class` can be an object or an array, has the hash that scopes the component's
  * styles added and is merged with the `class:` directives of the element, and `style` is merged
  * with its `style:` directives, as on an element without a spread.
- * A key is used as it is written: `readonly` is the attribute and `readOnly` the property
+ * On an HTML element a key is matched in lower case, and as the property that goes by another
+ * name where there is one: `readonly`, `readOnly` and `READONLY` are all the `readOnly` property.
+ * Elsewhere (SVG, MathML) it is used as it is written
  * @param next New attributes - this function mutates this object
  */
 function set_attributes(
@@ -289,6 +291,7 @@ function set_attributes(
 	}
 
 	var setters = get_setters(element);
+	var is_html = element.namespaceURI === NAMESPACE_HTML;
 
 	// since key is captured we use const
 	for (const key in next) {
@@ -298,7 +301,6 @@ function set_attributes(
 		if (key === 'class') {
 			if (classes) {
 				// (`attribute_effect` puts what is under a symbol into `current`, which `prev` is)
-				var is_html = element.namespaceURI === NAMESPACE_HTML;
 				set_class(element, is_html, value, css_hash, prev?.[class_key!], classes);
 				current[key] = value;
 				continue;
@@ -357,25 +359,32 @@ function set_attributes(
 
 				current[event_handle_key] = create_event(event_name, element, handle, opts);
 			}
-		} else if (value == null) {
-			attributes[key] = null;
-			element.removeAttribute(key);
-		} else if (
-			// `style` goes through its setter also as a string, because a content security
-			// policy can forbid the attribute. So does `value`, because the attribute of an
-			// input is only where it starts
-			(typeof value !== 'string' || key === 'style' || key === 'value') &&
-			setters.has(key)
-		) {
-			// a string that the element has as its `value` already is not assigned again:
-			// `1e` typed into a number input reads as '', and assigning '' would clear it
-			if (key !== 'value' || (element as any).value !== value || typeof value !== 'string') {
-				(element as any)[key] = value;
-				// remove it from attributes's cache
-				if (key in attributes) attributes[key] = UNINITIALIZED;
+		} else {
+			// `{ readonly: false }` has to end up as the `readOnly` property: as an attribute it
+			// would be `readonly="false"`, which is read-only
+			var name = is_html ? normalize_attribute(key) : key;
+
+			if (value == null) {
+				// (the cache of `set_attribute` is by the name it was given, which is `name`)
+				attributes[name] = null;
+				element.removeAttribute(key);
+			} else if (
+				// `style` goes through its setter also as a string, because a content security
+				// policy can forbid the attribute. So does `value`, because the attribute of an
+				// input is only where it starts
+				(typeof value !== 'string' || key === 'style' || key === 'value') &&
+				setters.has(name)
+			) {
+				// a string that the element has as its `value` already is not assigned again:
+				// `1e` typed into a number input reads as '', and assigning '' would clear it
+				if (key !== 'value' || (element as any).value !== value || typeof value !== 'string') {
+					(element as any)[name] = value;
+					// remove it from attributes's cache
+					if (name in attributes) attributes[name] = UNINITIALIZED;
+				}
+			} else if (typeof value !== 'function') {
+				set_attribute(element, name, value, skip_warning);
 			}
-		} else if (typeof value !== 'function') {
-			set_attribute(element, key, value, skip_warning);
 		}
 	}
 
