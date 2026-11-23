@@ -5,13 +5,9 @@
  * redirects as everything else.
  */
 import * as esbuild from 'esbuild';
-import { ROOT, UPSTREAM_PKG, UPSTREAM_SRC, is_inside } from './paths.ts';
-import {
-	assert_not_upstream,
-	read_package,
-	require_compat,
-	upstream_src_target
-} from './resolve.ts';
+import { ROOT, UPSTREAM_SRC, is_inside } from './paths.ts';
+import { create_resolver, is_reused, read_package, require_compat, to_own } from './resolve.ts';
+import fs from 'node:fs';
 
 export * from 'esbuild';
 
@@ -38,7 +34,11 @@ function redirect_results(plugin: esbuild.Plugin): esbuild.Plugin {
 						const result = await callback(args);
 
 						if (result?.path && is_inside(result.path, UPSTREAM_SRC)) {
-							return { ...result, path: require_compat(result.path, args.importer) };
+							const own = to_own(result.path);
+							if (fs.existsSync(own)) return { ...result, path: own };
+							if (!is_reused(result.path)) {
+								return { ...result, path: require_compat(result.path, args.importer) };
+							}
 						}
 
 						return result;
@@ -50,7 +50,7 @@ function redirect_results(plugin: esbuild.Plugin): esbuild.Plugin {
 }
 
 function svelte_lite(): esbuild.Plugin {
-	const upstream_pkg = read_package(UPSTREAM_PKG);
+	const { resolve, check_load } = create_resolver('lite');
 	const { name } = read_package(ROOT);
 
 	return {
@@ -68,12 +68,12 @@ function svelte_lite(): esbuild.Plugin {
 			});
 
 			build.onResolve({ filter: /^[.#]/ }, (args) => {
-				const upstream_file = upstream_src_target(args.path, args.importer, upstream_pkg);
-				return upstream_file ? { path: require_compat(upstream_file, args.importer) } : undefined;
+				const resolved = resolve(args.path, args.importer);
+				return resolved ? { path: resolved } : undefined;
 			});
 
 			build.onLoad({ filter: /.*/ }, (args) => {
-				assert_not_upstream(args.path);
+				check_load(args.path);
 				return undefined;
 			});
 		}

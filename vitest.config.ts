@@ -11,6 +11,7 @@ import path from 'node:path';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { ROOT, UPSTREAM_ROOT, get_impl } from './harness/paths.ts';
 import SummaryReporter from './harness/reporter.ts';
+import { read_scope } from './harness/scope.ts';
 import { svelte_impl } from './harness/vite-plugin.ts';
 
 /** The upstream config this file was last brought in line with */
@@ -33,10 +34,19 @@ if (crypto.createHash('sha256').update(upstream_config).digest('hex') !== MIRROR
 	);
 }
 
-const sharded_suites: Record<string, { count: number; isolate: string[] }> = {
-	[`${pkg}/tests/runtime-runes/test.ts`]: { count: 4, isolate: ['inspect-trace'] },
-	[`${pkg}/tests/runtime-legacy/test.ts`]: { count: 3, isolate: [] }
-};
+// suites that svelte-lite leaves out as a whole are not worth running against it
+const left_out = impl === 'lite' ? Object.keys(read_scope().suites) : [];
+const is_left_out = (file: string) =>
+	left_out.some((suite) => file.startsWith(`${pkg}/tests/${suite}`));
+
+const sharded_suites: Record<string, { count: number; isolate: string[] }> = Object.fromEntries(
+	Object.entries({
+		[`${pkg}/tests/runtime-runes/test.ts`]: { count: 4, isolate: ['inspect-trace'] },
+		[`${pkg}/tests/runtime-legacy/test.ts`]: { count: 3, isolate: [] as string[] }
+	}).filter(([file]) => !is_left_out(file))
+);
+
+const server_project = `${pkg}/tests/custom-renderers-server/test.ts`;
 
 // vitest prints every failure in full, which is thousands of stack traces while
 // most of svelte-lite is missing. FILTER narrows a run down far enough to want them.
@@ -53,7 +63,10 @@ export default defineConfig({
 			// The suite reuses compiled samples in `_output/` unless upstream's compiler has
 			// changed. That knows nothing of svelte-lite's compiler, and both implementations
 			// write to the same directories, so a run could pick up the other one's output.
-			NO_COMPILE_CACHE: 'true'
+			NO_COMPILE_CACHE: 'true',
+			// svelte-lite has no `experimental.async`, so the mode without it is the one
+			// that both implementations are run and compared in
+			SVELTE_NO_ASYNC: process.env.SVELTE_NO_ASYNC ?? 'true'
 		},
 		projects: [
 			{
@@ -71,7 +84,8 @@ export default defineConfig({
 						'**/samples/**',
 						...Object.keys(sharded_suites),
 						// runs in its own project with the server resolve condition
-						`${pkg}/tests/custom-renderers-server/**`
+						`${pkg}/tests/custom-renderers-server/**`,
+						...left_out.map((suite) => `${pkg}/tests/${suite}*/**`)
 					]
 				}
 			},
@@ -94,16 +108,20 @@ export default defineConfig({
 					...isolate.map((prefix) => project(prefix, { index: 0, count: 1, include: prefix }))
 				];
 			}),
-			{
-				extends: true,
-				// resolve `svelte` as if no `browser` condition was set
-				plugins: [svelte_impl(impl, { force_server: true })],
-				test: {
-					name: 'custom-renderer-server',
-					environment: 'node',
-					include: [`${pkg}/tests/custom-renderers-server/test.ts`]
-				}
-			}
+			...(is_left_out(server_project)
+				? []
+				: [
+						{
+							extends: true as const,
+							// resolve `svelte` as if no `browser` condition was set
+							plugins: [svelte_impl(impl, { force_server: true })],
+							test: {
+								name: 'custom-renderer-server',
+								environment: 'node' as const,
+								include: [server_project]
+							}
+						}
+					])
 		]
 	}
 });

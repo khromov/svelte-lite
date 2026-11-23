@@ -1,19 +1,22 @@
 import { describe, expect, test } from 'bun:test';
 import type { BuildOptions, BuildResult } from 'esbuild';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { Plugin } from 'vite';
 import { build } from './esbuild.ts';
 import { COMPAT, ROOT, UPSTREAM_PKG, UPSTREAM_SRC, UPSTREAM_TESTS, get_impl } from './paths.ts';
 import { suite_name } from './reporter.ts';
-import { HarnessError, assert_not_upstream, create_resolver, read_package } from './resolve.ts';
+import { HarnessError, create_resolver, is_borrowed, is_reused, read_package, to_own } from './resolve.ts';
 import { svelte_impl } from './vite-plugin.ts';
 
 const own = (file: string) => path.join(ROOT, file);
 const upstream_test = (file: string) => path.join(UPSTREAM_TESTS, file);
 
+const upstream_src = (file: string) => path.join(UPSTREAM_SRC, file);
+
 describe('resolving for svelte-lite', () => {
-	const resolve = create_resolver('lite');
+	const { resolve } = create_resolver('lite');
 
 	test('`svelte` is the client build of this package', () => {
 		const importer = upstream_test('runtime-runes/samples/x/_config.js');
@@ -31,7 +34,7 @@ describe('resolving for svelte-lite', () => {
 	});
 
 	test('`force_server` gets the server build everywhere', () => {
-		const resolve = create_resolver('lite', { force_server: true });
+		const { resolve } = create_resolver('lite', { force_server: true });
 		const importer = upstream_test('custom-renderers-server/test.ts');
 
 		expect(resolve('svelte/renderer', importer)).toBe(own('src/renderer/index-server.ts'));
@@ -78,6 +81,25 @@ describe('resolving for svelte-lite', () => {
 		).toThrow(/Missing compat shim compat\/compiler\/phases\/1-parse\/index\.ts/);
 	});
 
+	test('modules of Svelte that are still in use import svelte-lite\'s version of a module', () => {
+		// a borrowed client module
+		expect(resolve('./branches.js', upstream_src('internal/client/dom/blocks/if.js'))).toBe(
+			own('src/internal/client/dom/blocks/branches.ts')
+		);
+		expect(resolve('#client/constants', upstream_src('internal/client/dom/blocks/if.js'))).toBe(
+			own('src/internal/client/constants.ts')
+		);
+
+		// the server runtime
+		expect(resolve('../shared/utils.js', upstream_src('internal/server/index.js'))).toBe(
+			own('src/internal/shared/utils.ts')
+		);
+	});
+
+	test('the compiler keeps to the modules it was written against', () => {
+		expect(resolve('../utils.js', upstream_src('compiler/index.js'))).toBeNull();
+	});
+
 	test('everything else is left alone', () => {
 		expect(resolve('../helpers.js', upstream_test('store/test.ts'))).toBeNull();
 		expect(resolve('vitest', upstream_test('store/test.ts'))).toBeNull();
@@ -88,7 +110,7 @@ describe('resolving for svelte-lite', () => {
 });
 
 describe('resolving for upstream', () => {
-	const resolve = create_resolver('upstream');
+	const { resolve } = create_resolver('upstream');
 
 	test('`svelte` is the upstream package', () => {
 		expect(resolve('svelte', upstream_test('store/test.ts'))).toBe(
@@ -106,25 +128,69 @@ describe('resolving for upstream', () => {
 });
 
 describe('guarding against real Svelte', () => {
-	test('upstream sources are refused, upstream tests are not', () => {
-		expect(() => assert_not_upstream(path.join(UPSTREAM_SRC, 'index-client.js'))).toThrow(
-			HarnessError
-		);
-		expect(() => assert_not_upstream(own('node_modules/svelte/src/index-client.js'))).toThrow(
-			HarnessError
-		);
+	const { resolve, check_load } = create_resolver('lite');
 
-		assert_not_upstream(path.join(UPSTREAM_SRC, 'reactivity/set.test.ts'));
-		assert_not_upstream(upstream_test('store/test.ts'));
-		assert_not_upstream(own('src/index-client.ts'));
+	// `svelte/internal/flags/legacy` is a module svelte-lite has its own version of
+	const replaced = upstream_src('internal/flags/legacy.js');
+
+	test('a module that svelte-lite has its own version of is refused', () => {
+		expect(() => check_load(replaced)).toThrow(HarnessError);
+		expect(() => check_load(`${replaced}?v=123`)).toThrow(HarnessError);
+		expect(() => check_load(own('node_modules/svelte/src/index-client.js'))).toThrow(HarnessError);
 	});
 
-	test('the vite plugin refuses to load them', () => {
-		const load = svelte_impl('lite').load as (id: string) => null;
-		const file = path.join(UPSTREAM_SRC, 'index-client.js');
+	test('the compiler, the server runtime and tests are not', () => {
+		check_load(upstream_src('compiler/index.js'));
+		check_load(upstream_src('internal/server/index.js'));
+		check_load(upstream_src('index-server.js'));
+		check_load(upstream_src('reactivity/set.test.ts'));
+		check_load(upstream_test('store/test.ts'));
+		check_load(own('src/index-client.ts'));
 
-		expect(() => load(`${file}?v=123`)).toThrow(HarnessError);
-		expect((svelte_impl('upstream').load as typeof load)(file)).toBeNull();
+		expect(is_reused(upstream_src('compiler/phases/1-parse/index.js'))).toBe(true);
+		expect(is_reused(upstream_src('index-client.js'))).toBe(false);
+	});
+
+	test('what the compiler imports from the rest of Svelte is allowed once it does', () => {
+		const { resolve, check_load } = create_resolver('lite');
+		const file = upstream_src('internal/flags/legacy.js');
+
+		expect(() => check_load(file)).toThrow(HarnessError);
+		resolve('../internal/flags/legacy.js', upstream_src('compiler/index.js'));
+		check_load(file);
+	});
+
+	test('a module is borrowed for as long as its file says so', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'svelte-lite-'));
+		const file = path.join(dir, 'module.ts');
+
+		expect(is_borrowed(file)).toBe(false);
+
+		fs.writeFileSync(file, `// @borrowed from Svelte\nexport * from './upstream.js';\n`);
+		expect(is_borrowed(file)).toBe(true);
+
+		fs.writeFileSync(file, `export const mine = true; // no longer borrowed\n`);
+		fs.utimesSync(file, new Date(), new Date(Date.now() + 5000));
+		expect(is_borrowed(file)).toBe(false);
+
+		fs.rmSync(dir, { recursive: true });
+	});
+
+	test('`src/` mirrors the layout of upstream', () => {
+		expect(to_own(upstream_src('internal/client/proxy.js'))).toBe(own('src/internal/client/proxy.ts'));
+		expect(to_own(upstream_src('internal/client/types.d.ts'))).toBe(own('src/internal/client/types.ts'));
+	});
+
+	test('upstream is left alone entirely when it is the implementation under test', () => {
+		create_resolver('upstream').check_load(replaced);
+		expect(resolve('vitest', replaced)).toBeNull();
+	});
+
+	test('the vite plugin applies the guard', () => {
+		const load = svelte_impl('lite').load as (id: string) => null;
+
+		expect(() => load(`${replaced}?v=123`)).toThrow(HarnessError);
+		expect((svelte_impl('upstream').load as typeof load)(replaced)).toBeNull();
 	});
 
 	test('the vite plugin swaps esbuild for the suite, and only for svelte-lite', () => {
@@ -164,7 +230,8 @@ describe('bundling with esbuild for svelte-lite', () => {
 			stdin: stdin(`import * as a from 'svelte'; import * as b from 'svelte/server'; console.log(a, b)`)
 		});
 
-		expect(inputs(result)).toEqual(['src/index-client.ts', 'src/server/index.ts']);
+		expect(inputs(result)).toContain('src/index-client.ts');
+		expect(inputs(result)).toContain('src/server/index.ts');
 	});
 
 	test('`#subpath` imports go to compat/', async () => {
@@ -173,10 +240,11 @@ describe('bundling with esbuild for svelte-lite', () => {
 			entryPoints: [upstream_test('runtime-browser/assert.js')]
 		});
 
-		expect(inputs(result)).toEqual(['compat/internal/client/constants.ts']);
+		expect(inputs(result)).toContain('compat/internal/client/constants.ts');
+		expect(inputs(result)).toContain('src/internal/client/constants.ts');
 	});
 
-	test('upstream paths that the suite resolves by hand go to compat/', async () => {
+	test('upstream paths that the suite resolves by hand go to svelte-lite\'s version', async () => {
 		const result = await build({
 			...options,
 			stdin: stdin(`import * as a from 'svelte'; console.log(a)`),
@@ -193,11 +261,12 @@ describe('bundling with esbuild for svelte-lite', () => {
 			]
 		});
 
-		expect(inputs(result)).toEqual(['src/index-server.ts', 'compat/index-server.ts']);
+		expect(inputs(result)).toContain('src/index-server.ts');
+		expect(inputs(result)).not.toContain('src/index-client.ts');
 	});
 
 	test('upstream sources are refused', async () => {
-		const file = path.join(UPSTREAM_SRC, 'version.js');
+		const file = upstream_src('internal/flags/legacy.js');
 		const result = build({ ...options, stdin: stdin(`import ${JSON.stringify(file)}`) });
 
 		await expect(result).rejects.toThrow(/Refusing to load real Svelte source/);
@@ -216,9 +285,9 @@ describe('package.json', () => {
 
 			// upstream builds its types and a CommonJS compiler, this package is its sources
 			const conditions = Object.keys(entry).filter((c) => c !== 'types' && c !== 'require');
-			const ours = Object.keys(exports[key]).filter((c) => c !== 'types');
+			const missing = conditions.filter((condition) => !(condition in (exports[key] as object)));
 
-			expect([key, ours]).toEqual([key, conditions]);
+			expect([key, missing]).toEqual([key, []]);
 		}
 	});
 

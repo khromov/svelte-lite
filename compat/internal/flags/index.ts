@@ -1,2 +1,2 @@
 // Stands in for upstream src/internal/flags/index.js
-export {};
+export * from '../../../src/internal/flags/index.ts';

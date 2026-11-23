@@ -1,2 +1,2 @@
 // Stands in for upstream src/internal/client/error-handling.js
-export {};
+export * from '../../../src/internal/client/error-handling.ts';

@@ -1,2 +1,2 @@
 // Stands in for upstream src/internal/server/context.js
-export {};
+export * from '../../../vendor/svelte/packages/svelte/src/internal/server/context.js';

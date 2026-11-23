@@ -8,13 +8,16 @@ import { ELEMENT_NODE } from '#client/constants';
 ```
 
 When the suite runs against svelte-lite, an import of `src/<path>` in the Svelte repo resolves to
-`compat/<path>.ts` here. Each file re-exports the names the tests use from wherever svelte-lite
-implements them:
+`compat/<path>.ts` here, which re-exports the names the tests use from wherever svelte-lite has
+them. As long as `src/` mirrors Svelte's layout, that is the file with the same path:
 
 ```ts
 // compat/internal/client/proxy.ts
-export { proxy } from '../../../src/reactivity/proxy.ts';
+export * from '../../../src/internal/client/proxy.ts';
 ```
+
+Shims for the server runtime's internals re-export Svelte's own modules, since svelte-lite
+reuses that part.
 
 The unit tests that live in Svelte's `src/` (`src/**/*.test.ts`) import their neighbours the
 same way, and are redirected the same way.
@@ -23,6 +26,3 @@ same way, and are redirected the same way.
 A missing name only fails the tests that use it. A missing file stops every test that imports
 it from loading, so the audit exits with an error for those, and
 `bun run compat:audit --scaffold` creates them.
-
-`internal/client/constants.ts` is the one shim with content from the start: the suite's own
-helpers use the DOM node types in it to normalise HTML before comparing.

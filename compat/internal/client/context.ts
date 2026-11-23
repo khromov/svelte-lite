@@ -1,2 +1,2 @@
 // Stands in for upstream src/internal/client/context.js
-export {};
+export * from '../../../src/internal/client/context.ts';

@@ -1,2 +1,2 @@
 // Stands in for upstream src/constants.js
-export {};
+export * from '../src/constants.ts';

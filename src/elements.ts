@@ -1,2 +1,2 @@
-// Entry point for `svelte/elements` (types only). Not implemented yet.
-export {};
+// @borrowed from Svelte until svelte-lite has its own version of this module
+export type * from '../vendor/svelte/packages/svelte/elements.d.ts';

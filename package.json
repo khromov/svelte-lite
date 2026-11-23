@@ -14,7 +14,7 @@
 		},
 		"./package.json": "./package.json",
 		"./action": {
-			"types": "./src/action/index.ts"
+			"types": "./src/action/public.ts"
 		},
 		"./animate": {
 			"default": "./src/animate/index.ts"
@@ -44,7 +44,8 @@
 			"default": "./src/internal/init-operations.ts"
 		},
 		"./internal/flags/async": {
-			"default": "./src/internal/flags/async.ts"
+			"browser": "./src/internal/flags/async.ts",
+			"default": "./src/internal/flags/async-server.ts"
 		},
 		"./internal/flags/legacy": {
 			"default": "./src/internal/flags/legacy.ts"
@@ -101,13 +102,15 @@
 	},
 	"scripts": {
 		"setup": "bun scripts/setup.ts",
-		"test": "vitest run",
-		"test:upstream": "SVELTE_IMPL=upstream vitest run",
+		"test": "bun scripts/test.ts",
+		"test:upstream": "SVELTE_IMPL=upstream bun scripts/test.ts",
 		"test:types": "bun scripts/test-types.ts",
 		"check": "tsc --noEmit",
 		"compat:audit": "bun scripts/compat-audit.ts",
 		"upstream:sync-deps": "bun scripts/sync-upstream-deps.ts",
-		"upstream:update": "git submodule update --remote --depth 1 vendor/svelte && bun run upstream:sync-deps && bun run compat:audit --scaffold && bun test && bun run test:upstream"
+		"upstream:update": "git submodule update --remote --depth 1 vendor/svelte && bun run upstream:sync-deps && bun run compat:audit --scaffold && bun test && bun run test:upstream",
+		"borrowed": "bun scripts/borrow.ts",
+		"scope": "bun scripts/scope.ts"
 	},
 	"devDependencies": {
 		"@jridgewell/remapping": "2.3.5",

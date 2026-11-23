@@ -1,2 +1,5 @@
-// Entry point for `svelte/renderer` (svelte-custom-renderer, browser). Not implemented yet.
-export {};
+import { unsupported } from '../unsupported.ts';
+
+export function createRenderer(): never {
+	unsupported('custom renderers');
+}

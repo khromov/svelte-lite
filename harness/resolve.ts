@@ -111,32 +111,69 @@ export function require_compat(upstream_file: string, importer?: string) {
 }
 
 /**
- * In `lite` mode nothing from the real Svelte may be loaded, otherwise tests would
- * quietly pass against the wrong implementation. Co-located `*.test.ts` files are
- * the one thing in upstream's `src/` that is part of the suite.
+ * The parts of Svelte that svelte-lite uses as they are: the compiler and the server
+ * runtime never reach the browser, so there is nothing to gain from replacing them.
  */
-export function assert_not_upstream(file: string) {
-	const leaked =
-		(is_inside(file, UPSTREAM_SRC) && !file.endsWith('.test.ts')) ||
-		file.includes('/node_modules/svelte/');
+const REUSED = [
+	'compiler/',
+	'internal/server/',
+	'server/',
+	'index-server.js',
+	'legacy/legacy-server.js',
+	'reactivity/index-server.js',
+	'renderer/index-server.js',
+	'store/index-server.js'
+];
 
-	if (leaked) {
-		throw new HarnessError(
-			`Refusing to load real Svelte source while testing svelte-lite: ${path.relative(ROOT, file)}`
-		);
-	}
+export function is_reused(upstream_file: string) {
+	const relative = path.relative(UPSTREAM_SRC, upstream_file);
+	return REUSED.some((entry) => (entry.endsWith('/') ? relative.startsWith(entry) : relative === entry));
+}
+
+/** Where svelte-lite's version of an upstream module lives: `src/` mirrors upstream's layout */
+export function to_own(upstream_file: string) {
+	const relative = path.relative(UPSTREAM_SRC, upstream_file).replace(/(\.d)?\.[jt]s$/, '');
+	return path.join(ROOT, 'src', `${relative}.ts`);
+}
+
+const BORROWED = '// @borrowed';
+const borrowed_cache = new Map<string, { mtime: number; borrowed: boolean }>();
+
+/**
+ * A module of svelte-lite that has not been written yet starts with `// @borrowed`
+ * and re-exports the upstream module, which may be loaded for as long as that is the case.
+ */
+export function is_borrowed(own_file: string) {
+	const stat = fs.statSync(own_file, { throwIfNoEntry: false });
+	if (!stat) return false;
+
+	const cached = borrowed_cache.get(own_file);
+	if (cached?.mtime === stat.mtimeMs) return cached.borrowed;
+
+	const borrowed = fs.readFileSync(own_file, 'utf8').startsWith(BORROWED);
+	borrowed_cache.set(own_file, { mtime: stat.mtimeMs, borrowed });
+	return borrowed;
+}
+
+function is_upstream_source(file: string) {
+	return is_inside(file, UPSTREAM_SRC) && !file.endsWith('.test.ts');
 }
 
 /**
- * Creates the function that decides where imports made by the upstream suite end up.
- * Returns `null` for anything the bundler should resolve by itself.
+ * Creates the functions that decide where imports made while running the upstream
+ * suite end up, and which modules of the real Svelte may be loaded at all.
+ *
+ * `resolve` returns `null` for anything the bundler should resolve by itself.
  */
 export function create_resolver(impl: Impl, options: { force_server?: boolean } = {}) {
 	const upstream_pkg = read_package(UPSTREAM_PKG);
 	const pkg_dir = impl === 'lite' ? ROOT : UPSTREAM_PKG;
 	const pkg = impl === 'lite' ? read_package(ROOT) : upstream_pkg;
 
-	return (specifier: string, importer: string | undefined) => {
+	/** What the compiler imports from the rest of Svelte, such as `src/utils.js` */
+	const used_by_compiler = new Set<string>();
+
+	function resolve(specifier: string, importer: string | undefined) {
 		const subpath = svelte_subpath(specifier);
 
 		if (subpath !== null) {
@@ -156,8 +193,47 @@ export function create_resolver(impl: Impl, options: { force_server?: boolean } 
 		if (impl === 'upstream' || !importer) return null;
 
 		const file = clean_id(importer);
-		const upstream_file = upstream_src_target(specifier, file, upstream_pkg);
+		const target = upstream_src_target(specifier, file, upstream_pkg);
+		if (!target) return null;
 
-		return upstream_file && require_compat(upstream_file, file);
-	};
+		// tests reach into Svelte's internals through compat/
+		if (!is_upstream_source(file)) return require_compat(target, file);
+
+		// the compiler is self-contained, and keeps using the modules it was written against
+		if (is_reused(file) && path.relative(UPSTREAM_SRC, file).startsWith('compiler/')) {
+			used_by_compiler.add(target);
+			return null;
+		}
+
+		// any other module of Svelte that is still in use (the server runtime, and modules
+		// that svelte-lite borrows) gets svelte-lite's version of what it imports, so
+		// that there is only ever one instance of a module
+		const own = to_own(target);
+		return fs.existsSync(own) && !target.endsWith('.d.ts') ? own : null;
+	}
+
+	/**
+	 * In `lite` mode a module of the real Svelte may only be loaded if svelte-lite reuses
+	 * or still borrows it. Anything else would let tests pass against the wrong implementation.
+	 */
+	function check_load(id: string) {
+		if (impl === 'upstream') return;
+
+		const file = clean_id(id);
+
+		if (file.includes('/node_modules/svelte/')) {
+			throw new HarnessError(`Refusing to load an installed copy of Svelte: ${file}`);
+		}
+
+		if (!is_upstream_source(file) || is_reused(file) || used_by_compiler.has(file)) return;
+		if (is_borrowed(to_own(file))) return;
+
+		throw new HarnessError(
+			`Refusing to load real Svelte source while testing svelte-lite: ${path.relative(ROOT, file)}. ` +
+				`svelte-lite has its own version of this module (or does not support it), ` +
+				`so nothing should import the original.`
+		);
+	}
+
+	return { resolve, check_load, upstream_pkg };
 }

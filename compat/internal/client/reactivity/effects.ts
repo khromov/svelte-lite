@@ -1,2 +1,2 @@
 // Stands in for upstream src/internal/client/reactivity/effects.js
-export {};
+export * from '../../../../src/internal/client/reactivity/effects.ts';

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Plugin } from 'vite';
 import { ROOT, UPSTREAM_TESTS, is_inside, type Impl } from './paths.ts';
-import { assert_not_upstream, clean_id, create_resolver } from './resolve.ts';
+import { clean_id, create_resolver } from './resolve.ts';
 
 const esbuild_wrapper = path.join(ROOT, 'harness/esbuild.ts');
 
@@ -10,7 +10,7 @@ const esbuild_wrapper = path.join(ROOT, 'harness/esbuild.ts');
  * of the `svelte` alias in upstream's `vitest.config.js`.
  */
 export function svelte_impl(impl: Impl, options: { force_server?: boolean } = {}): Plugin {
-	const resolve = create_resolver(impl, options);
+	const { resolve, check_load } = create_resolver(impl, options);
 
 	return {
 		name: 'svelte-lite:impl',
@@ -26,7 +26,7 @@ export function svelte_impl(impl: Impl, options: { force_server?: boolean } = {}
 		},
 
 		load(id) {
-			if (impl === 'lite') assert_not_upstream(clean_id(id));
+			check_load(id);
 			return null;
 		}
 	};

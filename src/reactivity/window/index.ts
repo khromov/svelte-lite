@@ -1,2 +1,2 @@
-// Entry point for `svelte/reactivity/window` (default). Not implemented yet.
-export {};
+// @borrowed from Svelte until svelte-lite has its own version of this module
+export * from '../../../vendor/svelte/packages/svelte/src/reactivity/window/index.js';

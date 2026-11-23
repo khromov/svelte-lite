@@ -1,2 +1,2 @@
-// Entry point for `svelte/internal/server` (default). Not implemented yet.
-export {};
+// @reused from Svelte: the server runtime never reaches the browser, so svelte-lite does not replace it
+export * from '../../../vendor/svelte/packages/svelte/src/internal/server/index.js';

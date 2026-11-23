@@ -3,15 +3,29 @@
 		"target": "esnext",
 		"module": "esnext",
 		"moduleResolution": "bundler",
-		"lib": ["esnext", "dom", "dom.iterable"],
-		"types": ["bun"],
+		"lib": [
+			"esnext",
+			"dom",
+			"dom.iterable"
+		],
+		"types": [
+			"bun"
+		],
 		"strict": true,
 		"noEmit": true,
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
-		"noErrorTruncation": true
+		"noErrorTruncation": true,
+		"allowJs": true,
+		"checkJs": false
 	},
-	"include": ["src", "compat", "harness", "scripts", "vitest.config.ts"]
+	"include": [
+		"src",
+		"compat",
+		"harness",
+		"scripts",
+		"vitest.config.ts"
+	]
 }

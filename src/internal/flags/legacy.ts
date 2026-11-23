@@ -1,2 +1,3 @@
-// Entry point for `svelte/internal/flags/legacy` (default). Not implemented yet.
-export {};
+import { unsupported } from '../../unsupported.ts';
+
+unsupported('legacy mode: components have to use runes');

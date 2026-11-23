@@ -1,2 +1,3 @@
-// Entry point for `svelte/internal/flags/async` (default). Not implemented yet.
-export {};
+import { unsupported } from '../../unsupported.ts';
+
+unsupported('`experimental.async` in the browser');

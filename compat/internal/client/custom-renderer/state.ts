@@ -1,2 +1,2 @@
 // Stands in for upstream src/internal/client/custom-renderer/state.js
-export {};
+export * from '../../../../src/internal/client/custom-renderer/state.ts';

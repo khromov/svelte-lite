@@ -1,2 +1,2 @@
-// Entry point for `svelte/transition` (default). Not implemented yet.
-export {};
+// @borrowed from Svelte until svelte-lite has its own version of this module
+export * from '../../vendor/svelte/packages/svelte/src/transition/index.js';

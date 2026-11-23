@@ -1,2 +1,2 @@
 // Stands in for upstream src/internal/client/proxy.js
-export {};
+export * from '../../../src/internal/client/proxy.ts';

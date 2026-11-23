@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { COMPAT, ROOT, UPSTREAM_PKG, UPSTREAM_SRC, UPSTREAM_TESTS } from '../harness/paths.ts';
-import { read_package, to_compat, upstream_src_target } from '../harness/resolve.ts';
+import { is_reused, read_package, to_compat, to_own, upstream_src_target } from '../harness/resolve.ts';
 
 const scaffold = process.argv.includes('--scaffold');
 const upstream_pkg = read_package(UPSTREAM_PKG);
@@ -93,6 +93,7 @@ function exported_names(files: string[]) {
 		module: ts.ModuleKind.ESNext,
 		moduleResolution: ts.ModuleResolutionKind.Bundler,
 		allowImportingTsExtensions: true,
+		allowJs: true,
 		noEmit: true,
 		skipLibCheck: true
 	});
@@ -108,28 +109,12 @@ function exported_names(files: string[]) {
 	);
 }
 
-/** The export of upstream's package that `file` is a target of, mapped to svelte-lite's */
-function own_entry(file: string) {
-	const target = `./${path.relative(UPSTREAM_PKG, file)}`;
-	const own = read_package(ROOT);
-
-	for (const [key, entry] of Object.entries(upstream_pkg.exports)) {
-		if (typeof entry === 'string') continue;
-
-		for (const [condition, value] of Object.entries(entry)) {
-			const mapped = own.exports[key];
-			if (value === target && typeof mapped === 'object' && mapped[condition]) {
-				return path.join(ROOT, mapped[condition]);
-			}
-		}
-	}
-
-	return null;
-}
-
 function create_shim(upstream_file: string, shim: string) {
-	const entry = own_entry(upstream_file);
-	const from = entry && path.relative(path.dirname(shim), entry);
+	const own = to_own(upstream_file);
+
+	// svelte-lite's module if there is one, Svelte's if it is part of what svelte-lite reuses
+	const target = fs.existsSync(own) ? own : is_reused(upstream_file) ? upstream_file : null;
+	const from = target && path.relative(path.dirname(shim), target);
 
 	fs.mkdirSync(path.dirname(shim), { recursive: true });
 	fs.writeFileSync(
