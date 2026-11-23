@@ -687,8 +687,7 @@ function update_dependencies(reaction: Reaction, flags: number, value: any, erro
 		new_deps === null &&
 		batch_values === null &&
 		dv !== null &&
-		deps !== null &&
-		length === deps.length &&
+		length === deps?.length &&
 		reaction.edges === deps &&
 		(flags & (BLOCK_EFFECT | ASYNC)) === 0
 	) {
