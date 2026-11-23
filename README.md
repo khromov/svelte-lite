@@ -63,7 +63,7 @@ Gzipped, against Svelte 5.59.1:
 | A counter | 3,027 B | 12,931 B | −77% |
 | The same, hydrated | 3,513 B | 13,653 B | −74% |
 | A keyed list | 5,493 B | 14,754 B | −63% |
-| An element with spread attributes | 6,059 B | 16,547 B | −63% |
+| An element with spread attributes | 6,072 B | 16,547 B | −63% |
 | A TodoMVC-style app, three components | 8,268 B | 18,196 B | −55% |
 | The same with a transition and an animation | 10,595 B | 20,050 B | −47% |
 
