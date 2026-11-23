@@ -1,2 +1,8 @@
-// @borrowed from Svelte until svelte-lite has its own version of this module
-export type * from '../../vendor/svelte/packages/svelte/src/internal/types.d.ts';
+/** Anything except a function */
+export type NotFunction<T> = T extends Function ? never : T;
+
+declare global {
+	// @ts-ignore devalue has it in its types, but it's not part of the standard lib at the version our runtime is.
+	// We're not actually doing anything with it so we silence the error this way
+	type Float16Array = any;
+}

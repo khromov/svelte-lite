@@ -1,2 +1,4 @@
-// @borrowed from Svelte until svelte-lite has its own version of this module
-export type * from '../../../../vendor/svelte/packages/svelte/src/internal/client/dom/types.d.ts';
+export type TemplateStructure =
+	| string
+	| undefined
+	| [string, Record<string, string> | undefined, ...TemplateStructure[]];

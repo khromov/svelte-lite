@@ -1,2 +1,10 @@
-// @borrowed from Svelte until svelte-lite has its own version of this module
-export type * from '../../vendor/svelte/packages/svelte/src/motion/private.d.ts';
+export interface TickContext {
+	inv_mass: number;
+	dt: number;
+	opts: {
+		stiffness: number;
+		damping: number;
+		precision: number;
+	};
+	settled: boolean;
+}
