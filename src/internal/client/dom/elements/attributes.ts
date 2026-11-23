@@ -1,7 +1,8 @@
 import { DEV } from 'esm-env';
 import type { Effect } from '../../types.ts';
-import { ATTACHMENT_KEY, UNINITIALIZED } from '../../../../constants.ts';
+import { ATTACHMENT_KEY, NAMESPACE_HTML, UNINITIALIZED } from '../../../../constants.ts';
 import { is_capture_event } from '../../../../utils.ts';
+import { clsx, to_class } from '../../../shared/attributes.ts';
 import { get_descriptors, get_prototype_of } from '../../../shared/utils.ts';
 import {
 	ATTRIBUTES_CACHE,
@@ -22,17 +23,26 @@ import { hydrating, set_hydrating } from '../hydration.ts';
 import { set_attribute as set_attribute_op } from '../operations.ts';
 import { queue_micro_task } from '../task.ts';
 import { attach } from './attachments.ts';
+import { set_class } from './class.ts';
 import { create_event } from './events.ts';
 import { add_form_reset_listener } from './misc.ts';
 
 /**
  * What a spread is given: attributes by name, plus `CLASS`, `STYLE` and attachments
- * (`createAttachmentKey()`) by symbol. Of the symbols, only the attachments are applied
+ * (`createAttachmentKey()`) by symbol. Of the symbols, `STYLE` is not applied
  */
 type Attributes = Record<string | symbol, any>;
 
+/**
+ * `CLASS`, once it exists. Compiled code is the only thing that refers to `CLASS`, and only for
+ * an element that has both a spread and `class:` directives. In an app without one, a bundler
+ * drops `CLASS`, which is marked as pure for that, so that this is never assigned and what
+ * `set_attributes` does for the directives goes too
+ */
+let class_key: symbol | undefined;
+
 /** The key the compiler puts the `class:` directives of an element with a spread under */
-export const CLASS = Symbol('class');
+export const CLASS = /* @__PURE__ */ (() => (class_key = Symbol('class')))();
 /** The key the compiler puts the `style:` directives of an element with a spread under */
 export const STYLE = Symbol('style');
 
@@ -235,7 +245,10 @@ export function set_custom_element_data(node: HTMLElement, prop: string, value: 
  * Spreads attributes onto a DOM element, taking into account the currently set attributes.
  * A key is an event handler (`on...`), a property (if the element has a setter for it and the
  * value is not a string) or an attribute, and `null` or `undefined` removes the attribute.
- * No element is treated differently from another, and of the keys only `style` and `value` are.
+ * No element is treated differently from another, and of the keys only `class`, `style` and
+ * `value` are. `class` can be an object or an array, has the hash that scopes the component's
+ * styles added and is merged with the `class:` directives of the element, as on an element
+ * without a spread.
  * A key is used as it is written: `readonly` is the attribute and `readOnly` the property
  * @param next New attributes - this function mutates this object
  */
@@ -256,11 +269,12 @@ function set_attributes(
 		}
 	}
 
-	if (css_hash) {
-		// `class` is a string like any other attribute here (and so is `style`), with the hash
-		// that scopes the component's styles added to it. Objects, arrays and `class:` directives
-		// are not applied
-		next.class = next.class ? next.class + ' ' + css_hash : css_hash;
+	var classes = class_key && next[class_key];
+
+	if (next.class) {
+		next.class = clsx(next.class);
+	} else if (css_hash || classes) {
+		next.class = null; /* so that the loop gets to `class` */
 	}
 
 	var setters = get_setters(element);
@@ -269,6 +283,20 @@ function set_attributes(
 	for (const key in next) {
 		// let instead of var because referenced in a closure
 		let value = next[key];
+
+		if (key === 'class') {
+			if (classes) {
+				// (`attribute_effect` puts what is under a symbol into `current`, which `prev` is)
+				var is_html = element.namespaceURI === NAMESPACE_HTML;
+				set_class(element, is_html, value, css_hash, prev?.[class_key!], classes);
+				current[key] = value;
+				continue;
+			}
+
+			// Without directives there is nothing to toggle, and the string with the hash in it
+			// is an attribute like any other: `null`, which is what '' gives, removes it
+			value = to_class(value, css_hash);
+		}
 
 		var prev_value = current[key];
 
