@@ -1,2 +1,7 @@
-// @borrowed from Svelte until svelte-lite has its own version of this module
-export * from '../../vendor/svelte/packages/svelte/src/reactivity/index-client.js';
+export { SvelteDate } from './date.ts';
+export { SvelteSet } from './set.ts';
+export { SvelteMap } from './map.ts';
+export { SvelteURL } from './url.ts';
+export { SvelteURLSearchParams } from './url-search-params.ts';
+export { MediaQuery } from './media-query.ts';
+export { createSubscriber } from './create-subscriber.ts';
