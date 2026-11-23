@@ -322,7 +322,7 @@ function set_attributes(
 			// Removing the `value` attribute of an `<option>` makes its text its value, and
 			// setting it to `null` or `undefined` gives the string "null" or "undefined". An
 			// option without a spread gets '' for those, and so does this one
-			(element as HTMLOptionElement).value = '';
+			(element as any).__value = (element as HTMLOptionElement).value = '';
 			current[key] = value;
 			continue;
 		}
@@ -395,13 +395,15 @@ function set_attributes(
 			// would be `readonly="false"`, which is read-only
 			var name = is_html ? normalize_attribute(key) : key;
 
-			if (is_select) {
-				// A select's default value is represented by selected options, not a property.
-				if (name === 'defaultValue') continue;
+			// A select's default value is represented by selected options, not a property.
+			if (is_select && name === 'defaultValue') continue;
 
-				// What `init_select` selects again when the options change. Only a select gets
-				// this from a spread: an `<option>` or an `<input>` with one has no `__value`
-				if (key === 'value') (element as any).__value = value;
+			// The value as it was given, which need not be a string. `bind:group` compares with
+			// that of an input, a `<select bind:value>` with that of its options, and
+			// `init_select` selects by a select's own again when its options change. Other
+			// elements are left alone: a custom element may keep something of its own there
+			if (key === 'value' && (is_select || is_option || element.localName === 'input')) {
+				(element as any).__value = value;
 			}
 
 			if (value == null) {
