@@ -1,2 +1,3 @@
-// @borrowed from Svelte until svelte-lite has its own version of this module
-export * from '../../vendor/svelte/packages/svelte/src/motion/utils.js';
+export function is_date(obj: any): obj is Date {
+	return Object.prototype.toString.call(obj) === '[object Date]';
+}
