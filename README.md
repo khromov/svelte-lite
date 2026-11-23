@@ -59,22 +59,41 @@ counter, which shows what that feature costs when it is used.
 `scope.json` names the features svelte-lite does not support and lists every test that fails
 because of one of them. Those tests still run, and are reported as unsupported instead of
 failed. Everything else that passes against Svelte has to pass against svelte-lite: a test
-that upstream passes and that did not run counts as a failure too.
+that upstream passes and that did not run counts as a failure too. `bun run scope` shows how
+many tests each feature accounts for.
 
 - **Legacy mode.** Every component is a runes component. The compiler entry point
   (`src/compiler/index.ts`) compiles in runes mode by default and rejects anything else.
-- **`experimental.async` in the browser**, which includes `fork` and pending boundaries. The
-  suite runs with `SVELTE_NO_ASYNC=true` for both implementations.
+- **`experimental.async` in the browser.** No `await` in components, no `fork()`, and a
+  `pending` snippet is never shown. The suite runs with `SVELTE_NO_ASYNC=true` for both
+  implementations. The scheduler is synchronous: there are no batches that hold their own
+  view of the state.
 - **Custom renderers.**
 
 Using one of these fails with an error that says so, when compiling where that is possible.
 
-Two things behave differently from Svelte without a test in the suite noticing:
+### Behaviour that differs from Svelte
 
+The synchronous scheduler gives up some edge cases of Svelte's. The first three have tests
+in the suite, which are out of scope for that reason:
+
+- **Teardowns read current values.** An effect's cleanup, `onDestroy` and the cleanup of an
+  action or attachment see state as it is now, not as it was before the change that caused
+  the teardown. A cleanup that dereferences state which has just become `null` throws.
+- **Blocks update when they re-run.** When an `$effect` writes to state that an `{#if}`,
+  `{#each}` or similar depends on, the DOM changes right away. In Svelte it changes at the end
+  of the flush, so effects later in the same flush still see the old DOM.
+- **An effect does not re-run because of its own write** to state that it only starts to
+  depend on during that same run.
+- `$state.eager(x)` is `x`, `$effect.pending()` is always `0`, and `settled()` is `tick()`.
+- In production builds, misuse (`state_unsafe_mutation`, `effect_orphan` and the like) is not
+  reported. It still is in dev.
+- If the expression of a `bind:this` throws while the binding is reset during teardown, the
+  error is swallowed.
 - When a `bind:value` setter changes what was typed (`(v) => (text = v.toUpperCase())`), the
   value is right but the caret moves to the end of the input. Svelte keeps it in place.
-- `hydratable()` fails with svelte-lite's own error instead of Svelte's. It needs
-  `experimental.async` in both.
+- `hydratable()` and `fork()` fail with svelte-lite's own error instead of Svelte's. Both need
+  `experimental.async` there too.
 
 ## How it works
 
