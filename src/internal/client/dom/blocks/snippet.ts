@@ -2,7 +2,6 @@ import type { Snippet } from '../../../../index.ts';
 import type { Getters } from '../../../shared/types.ts';
 import type { TemplateNode } from '../../types.ts';
 import { DEV } from 'esm-env';
-import { unsupported } from '../../../../unsupported.ts';
 import { prevent_snippet_stringification } from '../../../shared/validate.ts';
 import { EFFECT_TRANSPARENT, ELEMENT_NODE } from '../../constants.ts';
 import {
@@ -57,19 +56,6 @@ export function wrap_snippet(component: any, fn: (node: TemplateNode, ...args: a
 	prevent_snippet_stringification(snippet);
 
 	return snippet;
-}
-
-/**
- * Only the output of `experimental.customRenderer` calls this, and svelte-lite refuses to compile
- * with that option. It is still exported because `svelte/internal/client` exports it by name
- */
-export function renderer_snippet(): never {
-	unsupported('custom renderers');
-}
-
-/** See `renderer_snippet` */
-export function validate_snippet_renderer(): never {
-	unsupported('custom renderers');
 }
 
 /**
