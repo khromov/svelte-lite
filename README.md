@@ -27,7 +27,7 @@ for the browser tests.
 | --- | --- |
 | `bun run test` | The Svelte suite against svelte-lite |
 | `bun run test:upstream` | The same suite against Svelte itself, as a control and baseline |
-| `bun run test:types` | Svelte's type tests against svelte-lite (`SVELTE_IMPL=upstream` for the control) |
+| `bun run test:types` | Svelte's type tests against svelte-lite, minus the parts that cover custom renderers (`SVELTE_IMPL=upstream` for the control) |
 | `bun test` | Unit tests of the harness |
 | `bun run check` | Type-checks this repo's own code |
 | `bun run size` | Bundle size of small apps, compared with Svelte (`SVELTE_IMPL=upstream` measures the reference) |
@@ -69,6 +69,13 @@ that upstream passes and that did not run counts as a failure too.
 
 Using one of these fails with an error that says so, when compiling where that is possible.
 
+Two things behave differently from Svelte without a test in the suite noticing:
+
+- When a `bind:value` setter changes what was typed (`(v) => (text = v.toUpperCase())`), the
+  value is right but the caret moves to the end of the input. Svelte keeps it in place.
+- `hydratable()` fails with svelte-lite's own error instead of Svelte's. It needs
+  `experimental.async` in both.
+
 ## How it works
 
 `vendor/svelte` is a git submodule pinned to a commit of Svelte's `main` branch. Nothing in it
@@ -80,8 +87,9 @@ states:
 
 - **svelte-lite's own**: a TypeScript implementation.
 - **Borrowed**: a file that starts with `// @borrowed` and re-exports Svelte's module. This is
-  how the suite stays green while the runtime is replaced one module at a time.
-  `bun run borrowed` lists what is left.
+  how the suite stayed green while the runtime was replaced one module at a time. Nothing is
+  borrowed at present. `bun run borrowed` lists what is, and which of Svelte's modules have no
+  counterpart because svelte-lite does not support what they are for.
 - **Reused**: the compiler and the server runtime, for good.
 
 What differs from upstream is where imports lead, which `harness/` decides:
@@ -95,7 +103,8 @@ What differs from upstream is where imports lead, which `harness/` decides:
   See [compat/README.md](compat/README.md).
 - Loading a module of the real Svelte that is neither reused nor still borrowed is an error,
   so a test cannot pass against the wrong implementation by accident. The same goes for the
-  bundles that the browser tests build with esbuild, and for the type tests.
+  bundles that the browser tests build with esbuild. The type tests only accept types of
+  Svelte's that belong to the compiler or the server runtime.
 
 `bun run test:upstream` turns all of this off and runs the suite against the Svelte sources in
 the submodule, where every test passes. That is the evidence that a failure against svelte-lite

@@ -202,18 +202,6 @@ let last_processed: number | null = null;
 
 type Callbacks = Map<(batch: Batch) => void, Map<Value, BatchValue> | null>;
 
-/**
- * `types.ts` is still Svelte's declaration file. The batch that its types refer to (in
- * `EachState`) is the class in Svelte's own module, and a class with `#private` members is a
- * nominal type: only its own instances are assignable to it. Until `types.ts` refers to this
- * module, the class below is declared to extend that type, so that its instances can go
- * wherever those types ask for a batch.
- * TODO remove this and the interface below once `types.ts` is svelte-lite's own
- */
-type DeclaredBatch = EachState['pending'] extends Map<infer B, any> ? B : never;
-
-export interface Batch extends DeclaredBatch {}
-
 export class Batch {
 	id = uid++;
 
@@ -1477,15 +1465,6 @@ export class Batch {
 		this.linked = false;
 		this.#release_records();
 	}
-}
-
-/**
- * Lets a custom renderer run a callback each time a batch has updated the content, before its
- * user effects run. svelte-lite has no custom renderers, so nothing is behind it. The name
- * stays for as long as `custom-renderer/containers`, which is still Svelte's, imports it.
- */
-export function set_before_effects(fn: (() => void) | null): void {
-	unsupported('custom renderers');
 }
 
 /**

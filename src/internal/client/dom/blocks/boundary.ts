@@ -66,18 +66,6 @@ export function boundary(
 	new Boundary(node, props, children, transform_error);
 }
 
-/**
- * `types.ts` is still Svelte's declaration file. The boundary that the type of an effect refers
- * to (`Effect#b`) is the class in Svelte's own module, and a class with `#private` members is a
- * nominal type: only its own instances are assignable to it. Until `types.ts` refers to this
- * module, the class below is declared to extend that type, so that its instances can be
- * stored in `Effect#b`.
- * TODO remove this and the interface below once `types.ts` is svelte-lite's own
- */
-type DeclaredBoundary = NonNullable<Effect['b']>;
-
-export interface Boundary extends DeclaredBoundary {}
-
 export class Boundary {
 	parent: Boundary | null;
 
