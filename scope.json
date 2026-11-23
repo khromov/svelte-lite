@@ -7,7 +7,16 @@
 		"abort-signal": "`getAbortSignal()`",
 		"self-invalidation": "An effect re-running because of a write it made itself",
 		"teardown-old-values": "Teardown functions reading the values from before the change, and block changes that wait for the end of a flush",
-		"prod-validation": "Misuse errors in production builds (they are still raised in dev)"
+		"prod-validation": "Misuse errors in production builds (they are still raised in dev)",
+		"delegation": "Event delegation: a handler is attached to the element it is on",
+		"spread": "Special cases of spread attributes: `<select>` values, class and style objects and directives, attachments, autofocus, attribute aliases",
+		"form-reset": "Bound values following `form.reset()`",
+		"bind-write-back": "Writing a bound value back to the input after its setter changed it",
+		"action-deep-read": "`use:` actions updating when their parameter is mutated in place",
+		"each-moves": "Keyed `{#each}` moving as few items as possible",
+		"error-codes": "Named error codes in production builds",
+		"trusted-types": "The Trusted Types policy that Svelte creates for HTML it parses",
+		"mount-events": "The deprecated `events` option of `mount()`"
 	},
 	"suites": {
 		"runtime-legacy": "legacy",
