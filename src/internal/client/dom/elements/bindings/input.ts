@@ -1,6 +1,6 @@
 import { DEV } from 'esm-env';
 import { render_effect, teardown } from '../../../reactivity/effects.ts';
-import { listen_to_event_and_reset_event } from './shared.ts';
+import { listen_to_event } from './shared.ts';
 import * as e from '../../../errors.ts';
 import { is } from '../../../proxy.ts';
 import { queue_micro_task } from '../../task.ts';
@@ -15,13 +15,13 @@ export function bind_value(
 	get: () => unknown,
 	set: (value: unknown) => void = get
 ): void {
-	listen_to_event_and_reset_event(input, 'input', async (is_reset) => {
+	listen_to_event(input, 'input', async () => {
 		if (DEV && input.type === 'checkbox') {
 			// TODO should this happen in prod too?
 			e.bind_invalid_checkbox_value();
 		}
 
-		var value: any = is_reset ? input.defaultValue : input.value;
+		var value: any = input.value;
 		value = is_numberlike_input(input) ? to_number(value) : value;
 		set(value);
 
@@ -123,21 +123,15 @@ export function bind_group(
 
 	binding_group.push(input);
 
-	listen_to_event_and_reset_event(
-		input,
-		'change',
-		() => {
-			var value = input.__value;
+	listen_to_event(input, 'change', () => {
+		var value = input.__value;
 
-			if (is_checkbox) {
-				value = get_binding_group_value(binding_group, value, input.checked);
-			}
+		if (is_checkbox) {
+			value = get_binding_group_value(binding_group, value, input.checked);
+		}
 
-			set(value);
-		},
-		// TODO better default value handling
-		() => set(is_checkbox ? [] : null)
-	);
+		set(value);
+	});
 
 	render_effect(() => {
 		var value = get();
@@ -196,9 +190,8 @@ export function bind_checked(
 	get: () => unknown,
 	set: (value: unknown) => void = get
 ): void {
-	listen_to_event_and_reset_event(input, 'change', (is_reset) => {
-		var value = is_reset ? input.defaultChecked : input.checked;
-		set(value);
+	listen_to_event(input, 'change', () => {
+		set(input.checked);
 	});
 
 	if (
@@ -247,23 +240,9 @@ export function bind_files(
 	get: () => FileList | null,
 	set: (value: FileList | null) => void = get
 ): void {
-	listen_to_event_and_reset_event(
-		input,
-		'change',
-		() => {
-			set(input.files);
-		},
-		() => {
-			// A form reset can empty the input's `FileList` in place, which is then the very
-			// object the binding already holds and would not be seen as a change: give the
-			// input a new, empty one instead
-			if (typeof DataTransfer === 'function') {
-				input.files = new DataTransfer().files;
-			}
-
-			set(input.files);
-		}
-	);
+	listen_to_event(input, 'change', () => {
+		set(input.files);
+	});
 
 	if (
 		// If we are hydrating and the value has since changed,

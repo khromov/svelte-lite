@@ -5,8 +5,6 @@ import {
 	set_active_effect,
 	set_active_reaction
 } from '../../../runtime.ts';
-import { FORM_RESET_HANDLER } from '../../../constants.ts';
-import { add_form_reset_listener } from '../misc.ts';
 
 /**
  * Fires the handler once immediately (unless corresponding arg is set to `false`),
@@ -47,26 +45,10 @@ export function without_reactive_context<T>(fn: () => T): T {
 }
 
 /**
- * Listen to the given event, and then instantiate a global form reset listener if not already done,
- * to notify all bindings when the form is reset
+ * Listen to the given event for as long as the element lives. Svelte also notifies the
+ * binding when the element's form is reset, which is left out: after `form.reset()` the
+ * bound state keeps its value until the next event from the element
  */
-export function listen_to_event_and_reset_event(
-	element: HTMLElement & { [FORM_RESET_HANDLER]?: () => void },
-	event: string,
-	handler: (is_reset?: true) => void,
-	on_reset: (is_reset?: true) => void = handler
-): void {
+export function listen_to_event(element: HTMLElement, event: string, handler: () => void): void {
 	element.addEventListener(event, () => without_reactive_context(handler));
-	const prev = element[FORM_RESET_HANDLER];
-	if (prev) {
-		// special case for checkbox that can have multiple binds (group & checked)
-		element[FORM_RESET_HANDLER] = () => {
-			prev();
-			on_reset(true);
-		};
-	} else {
-		element[FORM_RESET_HANDLER] = () => on_reset(true);
-	}
-
-	add_form_reset_listener();
 }
