@@ -1,5 +1,5 @@
 import { effect, teardown } from '../../../reactivity/effects.ts';
-import { listen_to_event_and_reset_event } from './shared.ts';
+import { listen_to_event } from './shared.ts';
 import { is } from '../../../proxy.ts';
 import { is_array } from '../../../../shared/utils.ts';
 import * as w from '../../../warnings.ts';
@@ -9,6 +9,12 @@ import * as w from '../../../warnings.ts';
  * spreading write too. `__defaultValue` is the one a form reset restores
  */
 type Select = HTMLSelectElement & { __value?: unknown; __defaultValue?: unknown };
+
+/**
+ * Whether any `<select>` was given a `defaultValue`. Only `set_default_select_value` does that,
+ * so in an app that never calls it, a bundler drops what `init_select` does for defaults
+ */
+let has_default_values = false;
 
 /**
  * Sets the `selected` attribute on an option so form reset can restore it.
@@ -32,6 +38,7 @@ export function set_selected(option: HTMLOptionElement, selected: boolean): void
 export function set_default_select_value(select: Select, value: any): void {
 	var mounting = !('__defaultValue' in select);
 	if (!mounting && select.__defaultValue === value) return;
+	has_default_values = true;
 	select.__defaultValue = value;
 	apply_default_select_value(select, !mounting || '__value' in select);
 }
@@ -124,7 +131,7 @@ export function init_select(select: Select): void {
 		// handler), which can happen before the `change` handler has updated `__value`
 		if (entries.every(is_selectedcontent_mutation)) return;
 
-		if ('__defaultValue' in select) {
+		if (has_default_values && '__defaultValue' in select) {
 			apply_default_select_value(select, false);
 		}
 
@@ -158,15 +165,14 @@ export function bind_select_value(
 ): void {
 	var mounting = true;
 
-	listen_to_event_and_reset_event(select, 'change', (is_reset) => {
-		var query = is_reset ? '[selected]' : ':checked';
+	listen_to_event(select, 'change', () => {
 		var value: unknown;
 
 		if (select.multiple) {
-			value = Array.from(select.querySelectorAll<HTMLOptionElement>(query), get_option_value);
+			value = Array.from(select.querySelectorAll<HTMLOptionElement>(':checked'), get_option_value);
 		} else {
 			var selected_option: HTMLOptionElement | null =
-				select.querySelector(query) ??
+				select.querySelector(':checked') ??
 				// will fall back to first non-disabled option if no option is selected
 				select.querySelector('option:not([disabled])');
 			value = selected_option && get_option_value(selected_option);
