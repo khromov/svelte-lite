@@ -2,6 +2,7 @@ import type { Effect } from './types.ts';
 import { DEV } from 'esm-env';
 import { FILENAME, HYDRATION_ERROR } from '../../constants.ts';
 import { is_firefox } from './dom/operations.ts';
+import { hydrating } from './dom/hydration.ts';
 import { BOUNDARY_EFFECT, REACTION_RAN, EFFECT, DESTROYED, DESTROYING } from './constants.ts';
 import { define_property, get_descriptor } from '../shared/utils.ts';
 import { active_effect } from './runtime.ts';
@@ -48,7 +49,8 @@ export function handle_error(error: unknown): unknown {
 }
 
 export function invoke_error_boundary(error: unknown, effect: Effect | null): void {
-	if (error === HYDRATION_ERROR) {
+	// (only thrown while hydrating, which a bundler can tell an app that never hydrates is not)
+	if (hydrating && error === HYDRATION_ERROR) {
 		throw error;
 	}
 

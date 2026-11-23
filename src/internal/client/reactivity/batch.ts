@@ -118,7 +118,11 @@ function flush(): void {
 			collected_effects = null;
 
 			if (has_effects) {
-				flush_effects(effects);
+				try {
+					flush_effects(effects);
+				} finally {
+					eager_block_effects = null;
+				}
 			}
 		}
 	} catch (error) {
@@ -189,43 +193,44 @@ function traverse(root: Effect, effects: Effect[]): void {
 	}
 }
 
+/**
+ * (The `try` that unsets `eager_block_effects` is around the call, in `flush`, and not in here:
+ * a bundler leaves what is inside a `try` block as it is, and so would keep the check of a flag
+ * that is never set)
+ */
 function flush_effects(effects: Effect[]): void {
-	try {
-		// Only the effects that are marked by now run in this turn. What they mark, by writing to
-		// state, waits for the next turn, by which time the DOM is up to date again
-		for (var effect of effects.filter(is_marked)) {
-			if ((effect.f & (DESTROYED | INERT)) === 0 && is_dirty(effect)) {
-				var blocks: Effect[] = (eager_block_effects = []);
+	// Only the effects that are marked by now run in this turn. What they mark, by writing to
+	// state, waits for the next turn, by which time the DOM is up to date again
+	for (var effect of effects.filter(is_marked)) {
+		if ((effect.f & (DESTROYED | INERT)) === 0 && is_dirty(effect)) {
+			var blocks: Effect[] = (eager_block_effects = []);
 
-				update_effect(effect);
+			update_effect(effect);
 
-				// Effects with no dependencies or teardown do not get added to the effect tree.
-				// Deferred effects (e.g. `$effect(...)`) _are_ added to the tree because we
-				// don't know if we need to keep them until they are executed. Doing the check
-				// here (rather than in `update_effect`) allows us to skip the work for
-				// immediate effects.
-				if (
-					effect.deps === null &&
-					effect.first === null &&
-					effect.nodes === null &&
-					effect.teardown === null &&
-					// (its signal aborts when it is destroyed, for which it has to be found)
-					!(has_abort_signals && effect.ac)
-				) {
-					// remove this effect from the graph
-					unlink_effect(effect);
-				}
+			// Effects with no dependencies or teardown do not get added to the effect tree.
+			// Deferred effects (e.g. `$effect(...)`) _are_ added to the tree because we
+			// don't know if we need to keep them until they are executed. Doing the check
+			// here (rather than in `update_effect`) allows us to skip the work for
+			// immediate effects.
+			if (
+				// (its signal aborts when it is destroyed, for which it has to be found)
+				!(has_abort_signals && effect.ac) &&
+				effect.deps === null &&
+				effect.first === null &&
+				effect.nodes === null &&
+				effect.teardown === null
+			) {
+				// remove this effect from the graph
+				unlink_effect(effect);
+			}
 
-				// If the effect wrote to state that a block depends on, the block runs before the next
-				// effect does, which may be inside a branch that the block is about to remove.
-				// (The array grows if a block makes other blocks dirty)
-				for (var i = 0; i < blocks.length; i++) {
-					update_block(blocks[i]);
-				}
+			// If the effect wrote to state that a block depends on, the block runs before the next
+			// effect does, which may be inside a branch that the block is about to remove.
+			// (The array grows if a block makes other blocks dirty)
+			for (var i = 0; i < blocks.length; i++) {
+				update_block(blocks[i]);
 			}
 		}
-	} finally {
-		eager_block_effects = null;
 	}
 }
 

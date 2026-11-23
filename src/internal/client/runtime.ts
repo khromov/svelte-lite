@@ -29,7 +29,7 @@ import {
 	unfreeze_derived_effects,
 	update_derived
 } from './reactivity/deriveds.ts';
-import { tracing_mode_flag } from '../flags/index.ts';
+import { async_mode_flag, tracing_mode_flag } from '../flags/index.ts';
 import { tracing_expressions } from './dev/tracing.ts';
 import { get_error } from '../shared/dev.ts';
 import {
@@ -81,8 +81,17 @@ export function set_active_effect(effect: Effect | null): void {
  */
 export let current_sources: Set<Value> | null = null;
 
+/**
+ * With `experimental.async`, an effect does depend on the state it creates. svelte-lite leaves
+ * that feature out and nothing in it sets the flag, so that a bundler takes it to be `false` and
+ * this costs nothing. It is read here because Svelte's signals suite sets it to check exactly this
+ */
 export function push_reaction_value(value: Value): void {
-	if (active_reaction !== null && (active_reaction.f & REACTION_IS_UPDATING) !== 0) {
+	if (
+		!async_mode_flag &&
+		active_reaction !== null &&
+		(active_reaction.f & REACTION_IS_UPDATING) !== 0
+	) {
 		(current_sources ??= new Set()).add(value);
 	}
 }
@@ -273,12 +282,8 @@ export function update_reaction(reaction: Reaction): any {
 function update_dependencies(reaction: Reaction): void {
 	var deps = reaction.deps;
 
-	if (
-		// nothing changed
-		(new_deps === null && (deps === null || skipped_deps === deps.length)) ||
-		// an effect can be destroyed while it runs, e.g. by an error boundary
-		(reaction.f & DESTROYED) !== 0
-	) {
+	// nothing changed
+	if (new_deps === null && (deps === null || skipped_deps === deps.length)) {
 		return;
 	}
 
@@ -288,19 +293,21 @@ function update_dependencies(reaction: Reaction): void {
 		deps.length = skipped_deps;
 	}
 
+	// (the reaction is among the reactions of its new dependencies already, see `get`)
 	if (new_deps !== null) {
 		if (deps === null || skipped_deps === 0) {
-			reaction.deps = deps = new_deps;
+			reaction.deps = new_deps;
 		} else {
 			for (var dep of new_deps) deps.push(dep);
 		}
+	}
 
-		// a derived that nothing listens to does not listen either, see `remove_reaction`
-		if ((reaction.f & CONNECTED) !== 0) {
-			for (dep of new_deps) {
-				(dep.reactions ??= []).push(reaction);
-			}
-		}
+	// An effect can be destroyed while it runs, e.g. by an error boundary. That took it out of the
+	// reactions of what it read in its previous run, and this does for what it has read in this one
+	if ((reaction.f & DESTROYED) !== 0) {
+		new_deps = null;
+		remove_reactions(reaction, 0);
+		reaction.deps = null;
 	}
 }
 
@@ -454,6 +461,15 @@ export function get<V>(signal: Value<V>): V {
 			skipped_deps++;
 		} else {
 			(new_deps ??= []).push(signal);
+
+			// The reaction is one of the signal's reactions from here on, and not only once it is
+			// done: a write to the signal while the reaction still runs marks it, like a write to
+			// what it read in its previous run does. An effect that reads state and then writes it
+			// runs again (`$effect(() => count++)`).
+			// (a derived that nothing listens to does not listen either, see `remove_reaction`)
+			if ((active_reaction.f & CONNECTED) !== 0) {
+				(signal.reactions ??= []).push(active_reaction);
+			}
 		}
 	}
 
@@ -517,10 +533,11 @@ export function get<V>(signal: Value<V>): V {
 			unfreeze_derived_effects(derived);
 			reconnect(derived);
 		}
-	}
 
-	if ((signal.f & ERROR_VALUE) !== 0) {
-		throw signal.v;
+		// (only the value of a derived can be an error, see `update_reaction`)
+		if ((derived.f & ERROR_VALUE) !== 0) {
+			throw derived.v;
+		}
 	}
 
 	return signal.v;

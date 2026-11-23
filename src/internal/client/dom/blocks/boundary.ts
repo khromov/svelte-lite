@@ -165,7 +165,7 @@ export function boundary(
 	 * Handles an error from inside the boundary, or throws it for the next boundary to handle
 	 */
 	function fail(error: unknown): void {
-		if (error === HYDRATION_ERROR) {
+		if (hydrating && error === HYDRATION_ERROR) {
 			throw error;
 		}
 

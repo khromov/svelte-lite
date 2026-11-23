@@ -8,7 +8,7 @@ import { active_effect, get, is_destroying_effect } from '../runtime.ts';
 import * as e from '../errors.ts';
 import { DESTROYED, LEGACY_PROPS, STATE_SYMBOL } from '../constants.ts';
 import { proxy } from '../proxy.ts';
-import { capture_store_binding } from './store.ts';
+import { capture_store_binding, has_stores } from './store.ts';
 import { unsupported } from '../../../unsupported.ts';
 
 export function update_prop(fn: (value?: number) => number, d: 1 | -1 = 1): number {
@@ -216,7 +216,8 @@ export function prop<V>(
 	var initial_value: V;
 	var is_store_sub = false;
 
-	if (bindable) {
+	// (a prop can only be bound to a store by a component that subscribes to one)
+	if (bindable && has_stores) {
 		[initial_value, is_store_sub] = capture_store_binding(() => props[key] as V);
 	} else {
 		initial_value = props[key] as V;

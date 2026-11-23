@@ -185,7 +185,8 @@ export function freeze_derived_effects(derived: Derived): void {
 
 	for (const e of derived.effects) {
 		// if the effect has a teardown function or abort signal, call it
-		if (e.teardown || (has_abort_signals && e.ac)) {
+		// (the flag comes first: only then does a bundler drop the check with it)
+		if ((has_abort_signals && e.ac) || e.teardown) {
 			e.teardown?.();
 
 			if (has_abort_signals) {
