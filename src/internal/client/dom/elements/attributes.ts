@@ -1,6 +1,5 @@
 import { DEV } from 'esm-env';
-import type { Effect } from '../../types.ts';
-import { ATTACHMENT_KEY, NAMESPACE_HTML, UNINITIALIZED } from '../../../../constants.ts';
+import { NAMESPACE_HTML, UNINITIALIZED } from '../../../../constants.ts';
 import { is_capture_event, normalize_attribute } from '../../../../utils.ts';
 import { clsx } from '../../../shared/attributes.ts';
 import { get_descriptors, get_prototype_of } from '../../../shared/utils.ts';
@@ -10,12 +9,7 @@ import {
 	IS_XHTML,
 	LOADING_ATTR_SYMBOL
 } from '../../constants.ts';
-import {
-	branch,
-	destroy_effect,
-	expressions,
-	managed
-} from '../../reactivity/effects.ts';
+import { expressions, managed } from '../../reactivity/effects.ts';
 import {
 	active_effect,
 	active_reaction,
@@ -27,13 +21,15 @@ import * as w from '../../warnings.ts';
 import { hydrating, set_hydrating } from '../hydration.ts';
 import { set_attribute as set_attribute_op } from '../operations.ts';
 import { queue_micro_task } from '../task.ts';
-import { attach } from './attachments.ts';
 import { set_class } from './class.ts';
 import { create_event } from './events.ts';
 import { add_form_reset_listener, autofocus } from './misc.ts';
 import { set_style } from './style.ts';
 
-/** What a spread is given: attributes by name, plus `CLASS`, `STYLE` and attachments by symbol */
+/**
+ * What a spread is given: attributes by name, plus `CLASS` and `STYLE` by symbol. Attachments,
+ * which are under symbols too (`createAttachmentKey()`), are not applied
+ */
 type Attributes = Record<string | symbol, any>;
 
 export const CLASS = Symbol('class');
@@ -442,37 +438,17 @@ export function attribute_effect(
 ): void {
 	var values = expressions(sync);
 	var prev: Attributes | undefined = undefined;
-	var effects: Record<symbol, Effect> = {};
 
 	managed(() => {
-		var next = fn(...values.map(get));
-		var current = set_attributes(
+		prev = set_attributes(
 			element,
 			prev,
-			next,
+			fn(...values.map(get)),
 			css_hash,
 			should_remove_defaults,
 			skip_warning
 		);
-
-		for (let symbol of Object.getOwnPropertySymbols(effects)) {
-			if (!next[symbol]) destroy_effect(effects[symbol]);
-		}
-
-		for (let symbol of Object.getOwnPropertySymbols(next)) {
-			var n = next[symbol];
-
-			if (symbol.description === ATTACHMENT_KEY && (!prev || n !== prev[symbol])) {
-				if (effects[symbol]) destroy_effect(effects[symbol]);
-				effects[symbol] = branch(() => attach(element, () => n));
-			}
-
-			current[symbol] = n;
-		}
-
-		prev = current;
 	});
-
 }
 
 function get_attributes(element: Element): Attributes {
