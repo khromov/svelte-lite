@@ -2,7 +2,12 @@
 	"reasons": {
 		"legacy": "Legacy mode: every component is a runes component",
 		"async": "`experimental.async`, `fork` and pending boundaries",
-		"custom-renderers": "Custom renderers (`svelte/renderer`)"
+		"custom-renderers": "Custom renderers (`svelte/renderer`)",
+		"eager": "`$state.eager`",
+		"abort-signal": "`getAbortSignal()`",
+		"self-invalidation": "An effect re-running because of a write it made itself",
+		"teardown-old-values": "Teardown functions reading the values from before the change, and block changes that wait for the end of a flush",
+		"prod-validation": "Misuse errors in production builds (they are still raised in dev)"
 	},
 	"suites": {
 		"runtime-legacy": "legacy",
