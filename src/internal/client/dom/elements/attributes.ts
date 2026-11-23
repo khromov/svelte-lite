@@ -1,6 +1,6 @@
 import { DEV } from 'esm-env';
-import { NAMESPACE_HTML, UNINITIALIZED } from '../../../../constants.ts';
-import { is_capture_event, normalize_attribute } from '../../../../utils.ts';
+import { UNINITIALIZED } from '../../../../constants.ts';
+import { is_capture_event } from '../../../../utils.ts';
 import { get_descriptors, get_prototype_of } from '../../../shared/utils.ts';
 import {
 	ATTRIBUTES_CACHE,
@@ -33,8 +33,6 @@ type Attributes = Record<string | symbol, any>;
 export const CLASS = Symbol('class');
 /** The key the compiler puts the `style:` directives of an element with a spread under */
 export const STYLE = Symbol('style');
-
-const IS_HTML = Symbol('is html');
 
 const LINK_TAG = IS_XHTML ? 'link' : 'LINK';
 const PROGRESS_TAG = IS_XHTML ? 'progress' : 'PROGRESS';
@@ -235,7 +233,8 @@ export function set_custom_element_data(node: HTMLElement, prop: string, value: 
  * Spreads attributes onto a DOM element, taking into account the currently set attributes.
  * A key is an event handler (`on...`), a property (if the element has a setter for it and the
  * value is not a string) or an attribute, and `null` or `undefined` removes the attribute.
- * No element is treated differently from another, and of the keys only `style` and `value` are
+ * No element is treated differently from another, and of the keys only `style` and `value` are.
+ * A key is used as it is written: `readonly` is the attribute and `readOnly` the property
  * @param next New attributes - this function mutates this object
  */
 function set_attributes(
@@ -309,32 +308,25 @@ function set_attributes(
 
 				current[event_handle_key] = create_event(event_name, element, handle, opts);
 			}
-		} else {
-			var name = key;
-			if (attributes[IS_HTML]) {
-				name = normalize_attribute(name);
+		} else if (value == null) {
+			attributes[key] = null;
+			element.removeAttribute(key);
+		} else if (
+			// `style` goes through its setter also as a string, because a content security
+			// policy can forbid the attribute. So does `value`, because the attribute of an
+			// input is only where it starts
+			(typeof value !== 'string' || key === 'style' || key === 'value') &&
+			setters.has(key)
+		) {
+			// a string that the element has as its `value` already is not assigned again:
+			// `1e` typed into a number input reads as '', and assigning '' would clear it
+			if (key !== 'value' || (element as any).value !== value || typeof value !== 'string') {
+				(element as any)[key] = value;
+				// remove it from attributes's cache
+				if (key in attributes) attributes[key] = UNINITIALIZED;
 			}
-
-			if (value == null) {
-				attributes[key] = null;
-				element.removeAttribute(key);
-			} else if (
-				// `style` goes through its setter also as a string, because a content security
-				// policy can forbid the attribute. So does `value`, because the attribute of an
-				// input is only where it starts
-				(typeof value !== 'string' || key === 'style' || key === 'value') &&
-				setters.has(name)
-			) {
-				// a string that the element has as its `value` already is not assigned again:
-				// `1e` typed into a number input reads as '', and assigning '' would clear it
-				if (key !== 'value' || (element as any).value !== value || typeof value !== 'string') {
-					(element as any)[name] = value;
-					// remove it from attributes's cache
-					if (name in attributes) attributes[name] = UNINITIALIZED;
-				}
-			} else if (typeof value !== 'function') {
-				set_attribute(element, name, value, skip_warning);
-			}
+		} else if (typeof value !== 'function') {
+			set_attribute(element, key, value, skip_warning);
 		}
 	}
 
@@ -365,9 +357,7 @@ export function attribute_effect(
 }
 
 function get_attributes(element: Element): Attributes {
-	return ((element as any)[ATTRIBUTES_CACHE] ??= {
-		[IS_HTML]: element.namespaceURI === NAMESPACE_HTML
-	});
+	return ((element as any)[ATTRIBUTES_CACHE] ??= {});
 }
 
 var setters_cache = new Map<string, Set<string>>();
