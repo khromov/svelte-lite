@@ -341,18 +341,26 @@ function set_attributes(
 export function attribute_effect(
 	element: Element & ElementCSSInlineStyle,
 	fn: (...expressions: any) => Attributes,
-	sync: Array<() => any> = [],
+	sync?: Array<() => any>,
 	async?: unknown,
 	blockers?: unknown,
 	css_hash?: string,
 	should_remove_defaults?: boolean,
 	skip_warning = false
 ): void {
-	var values = expressions(sync);
+	// only with expressions to memoize, so that an app whose spreads have none, and which has
+	// no other use for deriveds, does not get them from here
+	var values = sync && expressions(sync);
 	var prev: Attributes | undefined = undefined;
 
 	managed(() => {
-		prev = set_attributes(element, prev, fn(...values.map(get)), css_hash, skip_warning);
+		prev = set_attributes(
+			element,
+			prev,
+			values ? fn(...values.map(get)) : fn(),
+			css_hash,
+			skip_warning
+		);
 	});
 }
 
