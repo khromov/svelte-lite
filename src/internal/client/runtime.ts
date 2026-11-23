@@ -1113,7 +1113,7 @@ export function update_effect(effect: Effect): void {
 	active_effect = effect;
 
 	if (DEV) {
-		var previous_component_fn = dev_current_component_function;
+		var previous_component_fn: any = dev_current_component_function;
 		set_dev_current_component_function(effect.component_function);
 		var previous_stack: any = dev_stack;
 		// only block effects have a dev stack, keep the current one otherwise
