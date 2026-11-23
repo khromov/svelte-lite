@@ -103,9 +103,12 @@ that any one of them can be reverted.
 
 **Reactivity**
 
-- **Teardowns read current values.** An effect's cleanup, `onDestroy` and the cleanup of an
-  action or attachment see state as it is now, not as it was before the change that caused
-  the teardown. A cleanup that dereferences state which has just become `null` throws.
+- **Teardowns read older values only up to the end of a flush.** An effect's cleanup,
+  `onDestroy` and the cleanup of an action or attachment see state as it was before the
+  change that caused the teardown, as in Svelte, while the flush that the change set off is
+  running. A teardown that runs later, after an outro transition, sees state as it is then.
+  A derived that a teardown assigns to, or reads after assigning to what it depends on, can
+  give a value that Svelte would not.
 - **Blocks update when they re-run.** When an `$effect` writes to state that an `{#if}`,
   `{#each}` or similar depends on, the DOM changes right away. In Svelte it changes at the end
   of the flush, so effects later in the same flush still see the old DOM.

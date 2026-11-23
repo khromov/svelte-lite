@@ -10,7 +10,7 @@ import {
 	ROOT_EFFECT
 } from '../constants.ts';
 import { define_property } from '../../shared/utils.ts';
-import { has_abort_signals, is_dirty, update_effect } from '../runtime.ts';
+import { has_abort_signals, is_dirty, old_values, update_effect } from '../runtime.ts';
 import * as e from '../errors.ts';
 import { flush_tasks, queue_micro_task } from '../dom/task.ts';
 import { DEV } from 'esm-env';
@@ -138,6 +138,7 @@ function flush(): void {
 		is_scheduled = false;
 		last_scheduled_effect = null;
 		collected_effects = previously_collected_effects;
+		old_values.clear();
 
 		if (DEV) {
 			for (const source of source_stacks) {

@@ -14,6 +14,8 @@ import {
 	remove_reactions,
 	set_active_reaction,
 	set_is_destroying_effect,
+	set_teardown_version,
+	teardown_version,
 	untracking,
 	has_abort_signals,
 	abort_signal
@@ -369,8 +371,10 @@ export function execute_effect_teardown(effect: Effect): void {
 	var teardown = effect.teardown;
 	if (teardown !== null) {
 		const previously_destroying_effect = is_destroying_effect;
+		const previous_teardown_version = teardown_version;
 		const previous_reaction = active_reaction;
 		set_is_destroying_effect(true);
+		set_teardown_version(effect.wv);
 		set_active_reaction(null);
 		try {
 			teardown.call(null);
@@ -381,6 +385,7 @@ export function execute_effect_teardown(effect: Effect): void {
 			invoke_error_boundary(error, effect.parent);
 		} finally {
 			set_is_destroying_effect(previously_destroying_effect);
+			set_teardown_version(previous_teardown_version);
 			set_active_reaction(previous_reaction);
 		}
 	}
