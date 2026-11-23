@@ -1,7 +1,6 @@
 import type {
 	EachItem,
 	EachOutroGroup,
-	EachState,
 	Effect,
 	EffectNodes,
 	MaybeSource,
@@ -63,71 +62,6 @@ export function index(_: any, i: number) {
 	return i;
 }
 
-/**
- * Pause multiple effects simultaneously, and coordinate their
- * subsequent destruction. Used in each blocks
- */
-function pause_effects(state: EachState, to_destroy: Effect[], controlled_anchor: null | Node) {
-	var length = to_destroy.length;
-
-	var group: EachOutroGroup | undefined;
-	var remaining = to_destroy.length;
-
-	for (var i = 0; i < length; i++) {
-		let effect = to_destroy[i];
-
-		pause_effect(
-			effect,
-			() => {
-				if (group) {
-					group.pending.delete(effect);
-					group.done.add(effect);
-
-					if (group.pending.size === 0) {
-						var groups = state.outrogroups as Set<EachOutroGroup>;
-
-						destroy_effects(array_from(group.done));
-						groups.delete(group);
-
-						if (groups.size === 0) {
-							state.outrogroups = null;
-						}
-					}
-				} else {
-					remaining -= 1;
-				}
-			},
-			false
-		);
-	}
-
-	if (remaining === 0) {
-		// If we're in a controlled each block (i.e. the block is the only child of an
-		// element), and we are removing all items, _and_ there are no out transitions,
-		// we can use the fast path — emptying the element and replacing the anchor
-		var fast_path = controlled_anchor !== null;
-
-		if (fast_path) {
-			var anchor = controlled_anchor as Element;
-			var parent_node = anchor.parentNode as Element;
-
-			clear_text_content(parent_node);
-			parent_node.append(anchor);
-
-			state.items.clear();
-		}
-
-		destroy_effects(to_destroy, !fast_path);
-	} else {
-		group = {
-			pending: new Set(to_destroy),
-			done: new Set()
-		};
-
-		(state.outrogroups ??= new Set()).add(group);
-	}
-}
-
 function destroy_effects(to_destroy: Effect[], remove_dom = true) {
 	for (var i = 0; i < to_destroy.length; i++) {
 		destroy_effect(to_destroy[i], remove_dom);
@@ -173,6 +107,9 @@ export function each<V>(
 
 	var fallback: Effect | null = null;
 
+	/** The groups of items that are transitioning out together */
+	var outrogroups: Set<EachOutroGroup> | null = null;
+
 	// TODO: ideally we could use derived for runes mode but because of the ability
 	// to use a store which can be mutated, we can't do that here as mutating a store
 	// will still result in the collection array being the same from the store
@@ -190,7 +127,209 @@ export function each<V>(
 
 	var first_run = true;
 
-	var effect = block(() => {
+	// `pause_effects` and `reconcile` are in here so that what they share with the block is held in
+	// variables. In Svelte it is the fields of a state object, whose names a minifier has to keep
+
+	/**
+	 * Pause multiple effects simultaneously, and coordinate their
+	 * subsequent destruction
+	 */
+	function pause_effects(to_destroy: Effect[], controlled_anchor: null | Node) {
+		var length = to_destroy.length;
+
+		var group: EachOutroGroup | undefined;
+		var remaining = to_destroy.length;
+
+		for (var i = 0; i < length; i++) {
+			let effect = to_destroy[i];
+
+			pause_effect(
+				effect,
+				() => {
+					if (group) {
+						group.pending.delete(effect);
+						group.done.add(effect);
+
+						if (group.pending.size === 0) {
+							var groups = outrogroups as Set<EachOutroGroup>;
+
+							destroy_effects(array_from(group.done));
+							groups.delete(group);
+
+							if (groups.size === 0) {
+								outrogroups = null;
+							}
+						}
+					} else {
+						remaining -= 1;
+					}
+				},
+				false
+			);
+		}
+
+		if (remaining === 0) {
+			// If we're in a controlled each block (i.e. the block is the only child of an
+			// element), and we are removing all items, _and_ there are no out transitions,
+			// we can use the fast path — emptying the element and replacing the anchor
+			if (controlled_anchor !== null) {
+				var parent_node = controlled_anchor.parentNode as Element;
+
+				clear_text_content(parent_node);
+				parent_node.append(controlled_anchor);
+
+				items.clear();
+			}
+
+			destroy_effects(to_destroy, controlled_anchor === null);
+		} else {
+			group = {
+				pending: new Set(to_destroy),
+				done: new Set()
+			};
+
+			(outrogroups ??= new Set()).add(group);
+		}
+	}
+
+	/**
+	 * Add, remove, or reorder items output by an each block as its input changes.
+	 * Svelte works out the smallest set of moves. This walks the new order instead, and moves every
+	 * item that is not where the walk has got to in front of what is there
+	 */
+	function reconcile(array: V[]): void {
+		var is_animated = (flags & EACH_IS_ANIMATED) !== 0;
+
+		var length = array.length;
+		var current = skip_to_branch(each_effect.first);
+
+		var to_animate: undefined | Set<Effect>;
+
+		var to_destroy: Effect[] = [];
+
+		/** The effects of the items that stay or come in, in their new order */
+		var kept = new Set<Effect>();
+
+		var effect: Effect;
+
+		var i: number;
+
+		for (i = 0; i < length; i += 1) {
+			kept.add((items.get(get_key(array[i], i)) as EachItem).e);
+		}
+
+		/**
+		 * Pass over what is going away, from where the walk has got to. It stays where it is:
+		 * it may have a transition to play, and moving the items that stay around it costs more
+		 */
+		function skip() {
+			while (current !== null && !kept.has(current)) {
+				// If the each block isn't inert, then inert effects are currently outroing and will be removed once the transition is finished
+				if ((current.f & INERT) === 0 && current !== fallback) {
+					to_destroy.push(current);
+				}
+
+				current = skip_to_branch(current.next);
+			}
+		}
+
+		if (is_animated) {
+			for (effect of kept) {
+				// offscreen == coming in now, no animation in that case,
+				// else this would happen https://github.com/sveltejs/svelte/issues/17181
+				if ((effect.f & EFFECT_OFFSCREEN) === 0) {
+					effect.nodes?.a?.measure();
+					(to_animate ??= new Set()).add(effect);
+				}
+			}
+		}
+
+		for (effect of kept) {
+			if (outrogroups !== null) {
+				for (const group of outrogroups) {
+					group.pending.delete(effect);
+					group.done.delete(effect);
+				}
+			}
+
+			if ((effect.f & INERT) !== 0) {
+				resume_effect(effect);
+				if (is_animated) {
+					effect.nodes?.a?.unfix();
+					(to_animate ??= new Set()).delete(effect);
+				}
+			}
+
+			var offscreen = (effect.f & EFFECT_OFFSCREEN) !== 0;
+
+			if (offscreen) {
+				// a new item goes where the walk has got to, in front of anything there that is going away
+				effect.f ^= EFFECT_OFFSCREEN;
+			} else if (effect !== current) {
+				skip();
+			}
+
+			if (effect !== current) {
+				// (an item that is yet to be placed comes after `current`, which is therefore not `null`)
+				link(each_effect, effect.prev, effect.next);
+				link(each_effect, (current as Effect).prev, effect);
+				link(each_effect, effect, current);
+
+				move(effect, current, anchor);
+			} else {
+				current = skip_to_branch(effect.next);
+
+				// (new items come last, so there is nothing after this one that is in the DOM)
+				if (offscreen) move(effect, current, anchor);
+			}
+		}
+
+		// What is left is not in the new order. (This comes before the outro groups are tidied up,
+		// which can destroy `current`, and with that the way to what follows it)
+		skip();
+
+		if (outrogroups !== null) {
+			for (const group of outrogroups) {
+				if (group.pending.size === 0) {
+					destroy_effects(array_from(group.done));
+					outrogroups?.delete(group);
+				}
+			}
+
+			if (outrogroups.size === 0) {
+				outrogroups = null;
+			}
+		}
+
+		var destroy_length = to_destroy.length;
+
+		if (destroy_length > 0) {
+			var controlled_anchor = (flags & EACH_IS_CONTROLLED) !== 0 && length === 0 ? anchor : null;
+
+			if (is_animated) {
+				for (i = 0; i < destroy_length; i += 1) {
+					to_destroy[i].nodes?.a?.measure();
+				}
+
+				for (i = 0; i < destroy_length; i += 1) {
+					to_destroy[i].nodes?.a?.fix();
+				}
+			}
+
+			pause_effects(to_destroy, controlled_anchor);
+		}
+
+		if (is_animated) {
+			queue_micro_task(() => {
+				if (to_animate === undefined) return;
+				for (effect of to_animate) {
+					effect.nodes?.a?.apply();
+				}
+			});
+		}
+	}
+
+	var each_effect = block(() => {
 		var array = get(each_array);
 		var length = array.length;
 
@@ -288,13 +427,12 @@ export function each<V>(
 		}
 
 		// (creating an item can run code that destroys the block, by unmounting the app for example)
-		if (!first_run && (state.effect.f & DESTROYED) === 0) {
+		if (!first_run && (each_effect.f & DESTROYED) === 0) {
 			// Creating an item can also change the collection, so it is read
 			// again: an item that is no longer in it must not end up in the DOM
 			array = get(each_array);
 
-			state.fallback = fallback;
-			reconcile(state, array, anchor, flags, get_key);
+			reconcile(array);
 
 			if (fallback !== null) {
 				if (array.length === 0) {
@@ -326,8 +464,6 @@ export function each<V>(
 		get(each_array);
 	});
 
-	var state: EachState = { effect, flags, items, outrogroups: null, fallback };
-
 	first_run = false;
 
 	if (hydrating) {
@@ -343,150 +479,6 @@ function skip_to_branch(effect: Effect | null): Effect | null {
 		effect = effect.next;
 	}
 	return effect;
-}
-
-/**
- * Add, remove, or reorder items output by an each block as its input changes.
- * Svelte works out the smallest set of moves. This walks the new order instead, and moves every
- * item that is not where the walk has got to in front of what is there
- */
-function reconcile<V>(
-	state: EachState,
-	array: V[],
-	anchor: TemplateNode,
-	flags: number,
-	get_key: (value: V, index: number) => any
-): void {
-	var is_animated = (flags & EACH_IS_ANIMATED) !== 0;
-
-	var length = array.length;
-	var items = state.items;
-	var current = skip_to_branch(state.effect.first);
-
-	var to_animate: undefined | Set<Effect>;
-
-	var to_destroy: Effect[] = [];
-
-	/** The effects of the items that stay or come in, in their new order */
-	var kept = new Set<Effect>();
-
-	var effect: Effect;
-
-	var i: number;
-
-	for (i = 0; i < length; i += 1) {
-		kept.add((items.get(get_key(array[i], i)) as EachItem).e);
-	}
-
-	/**
-	 * Pass over what is going away, from where the walk has got to. It stays where it is:
-	 * it may have a transition to play, and moving the items that stay around it costs more
-	 */
-	function skip() {
-		while (current !== null && !kept.has(current)) {
-			// If the each block isn't inert, then inert effects are currently outroing and will be removed once the transition is finished
-			if ((current.f & INERT) === 0 && current !== state.fallback) {
-				to_destroy.push(current);
-			}
-
-			current = skip_to_branch(current.next);
-		}
-	}
-
-	if (is_animated) {
-		for (effect of kept) {
-			// offscreen == coming in now, no animation in that case,
-			// else this would happen https://github.com/sveltejs/svelte/issues/17181
-			if ((effect.f & EFFECT_OFFSCREEN) === 0) {
-				effect.nodes?.a?.measure();
-				(to_animate ??= new Set()).add(effect);
-			}
-		}
-	}
-
-	for (effect of kept) {
-		if (state.outrogroups !== null) {
-			for (const group of state.outrogroups) {
-				group.pending.delete(effect);
-				group.done.delete(effect);
-			}
-		}
-
-		if ((effect.f & INERT) !== 0) {
-			resume_effect(effect);
-			if (is_animated) {
-				effect.nodes?.a?.unfix();
-				(to_animate ??= new Set()).delete(effect);
-			}
-		}
-
-		var offscreen = (effect.f & EFFECT_OFFSCREEN) !== 0;
-
-		if (offscreen) {
-			// a new item goes where the walk has got to, in front of anything there that is going away
-			effect.f ^= EFFECT_OFFSCREEN;
-		} else if (effect !== current) {
-			skip();
-		}
-
-		if (effect !== current) {
-			// (an item that is yet to be placed comes after `current`, which is therefore not `null`)
-			link(state, effect.prev, effect.next);
-			link(state, (current as Effect).prev, effect);
-			link(state, effect, current);
-
-			move(effect, current, anchor);
-		} else {
-			current = skip_to_branch(effect.next);
-
-			// (new items come last, so there is nothing after this one that is in the DOM)
-			if (offscreen) move(effect, current, anchor);
-		}
-	}
-
-	// What is left is not in the new order. (This comes before the outro groups are tidied up,
-	// which can destroy `current`, and with that the way to what follows it)
-	skip();
-
-	if (state.outrogroups !== null) {
-		for (const group of state.outrogroups) {
-			if (group.pending.size === 0) {
-				destroy_effects(array_from(group.done));
-				state.outrogroups?.delete(group);
-			}
-		}
-
-		if (state.outrogroups.size === 0) {
-			state.outrogroups = null;
-		}
-	}
-
-	var destroy_length = to_destroy.length;
-
-	if (destroy_length > 0) {
-		var controlled_anchor = (flags & EACH_IS_CONTROLLED) !== 0 && length === 0 ? anchor : null;
-
-		if (is_animated) {
-			for (i = 0; i < destroy_length; i += 1) {
-				to_destroy[i].nodes?.a?.measure();
-			}
-
-			for (i = 0; i < destroy_length; i += 1) {
-				to_destroy[i].nodes?.a?.fix();
-			}
-		}
-
-		pause_effects(state, to_destroy, controlled_anchor);
-	}
-
-	if (is_animated) {
-		queue_micro_task(() => {
-			if (to_animate === undefined) return;
-			for (effect of to_animate) {
-				effect.nodes?.a?.apply();
-			}
-		});
-	}
 }
 
 function create_item<V>(
@@ -557,15 +549,15 @@ function move(effect: Effect, next: Effect | null, anchor: TemplateNode) {
 	}
 }
 
-function link(state: EachState, prev: Effect | null, next: Effect | null) {
+function link(parent: Effect, prev: Effect | null, next: Effect | null) {
 	if (prev === null) {
-		state.effect.first = next;
+		parent.first = next;
 	} else {
 		prev.next = next;
 	}
 
 	if (next === null) {
-		state.effect.last = prev;
+		parent.last = prev;
 	} else {
 		next.prev = prev;
 	}
