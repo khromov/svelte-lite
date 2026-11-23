@@ -1,0 +1,25 @@
+{
+	"reasons": {
+		"dev-error": "expects an error that is only raised in dev mode, in Svelte as well",
+		"dev-log": "expects something on the console that is only printed in dev mode, in Svelte as well",
+		"dev-message": "compares the text of a warning or an error, which outside of dev mode is only a link, in Svelte as well",
+		"terser-unused-read": "reads state in a statement of its own to depend on it, which terser takes for unused and drops, with Svelte as well",
+		"v8-message": "compares the text of an error as V8 words it, and the bundles run in Bun",
+		"vitest": "uses `vi` or `expect` of vitest, which is not there in a bundle"
+	},
+	"samples": {
+		"bigint-invalid": "v8-message",
+		"derived-fn-recursive": "dev-error",
+		"error-boundary-20": "dev-log",
+		"error-boundary-reset-premature": "dev-message",
+		"event-media-element-cleanup": "vitest",
+		"media-query": "vitest",
+		"props-bound-fallback": "dev-message",
+		"select-multiple-invalid-value": "dev-message",
+		"snippet-undefined": "dev-error",
+		"typescript-as-expression": "vitest"
+	},
+	"minified": {
+		"each-updates-9": "terser-unused-read"
+	}
+}
