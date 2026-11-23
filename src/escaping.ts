@@ -1,2 +1,21 @@
-// @borrowed from Svelte until svelte-lite has its own version of this module
-export * from '../vendor/svelte/packages/svelte/src/escaping.js';
+const ATTR_REGEX = /[&"<]/g;
+const CONTENT_REGEX = /[&<]/g;
+
+export function escape_html<V>(value: V, is_attr?: boolean) {
+	const str = String(value ?? '');
+
+	const pattern = is_attr ? ATTR_REGEX : CONTENT_REGEX;
+	pattern.lastIndex = 0;
+
+	let escaped = '';
+	let last = 0;
+
+	while (pattern.test(str)) {
+		const i = pattern.lastIndex - 1;
+		const ch = str[i];
+		escaped += str.substring(last, i) + (ch === '&' ? '&amp;' : ch === '"' ? '&quot;' : '&lt;');
+		last = i + 1;
+	}
+
+	return escaped + str.substring(last);
+}
