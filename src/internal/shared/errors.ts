@@ -1,9 +1,18 @@
 // The errors that the client and the server runtime have in common. Svelte generates this
 // module from `messages/shared-errors` with `scripts/process-messages`. This is that output
-// with types added, and it has to stay that: tests compare the texts, and the links lead to
-// Svelte's documentation of each code.
+// with types added, and in dev it has to stay that: tests compare the texts, and the links
+// lead to Svelte's documentation of each code.
+//
+// A production build for the browser throws a number in place of the name, to save bytes:
+// `https://svelte.dev/e/40` is `lifecycle_outside_component`. The table of numbers is at the
+// top of `../client/errors.ts`. The server runtime is Svelte's and keeps the names.
 
-import { DEV } from 'esm-env';
+import { BROWSER, DEV } from 'esm-env';
+
+/** What every error of a production build for the browser is thrown with */
+export function production_error(code: number): never {
+	throw new Error('https://svelte.dev/e/' + code);
+}
 
 /**
  * You need to specify a custom condition to use a custom renderer in a non-browser environment such as Node. Add the `svelte-custom-renderer` resolve condition (eg. run Node with `--conditions=svelte-custom-renderer`).
@@ -19,6 +28,8 @@ If you're using a bundler, add \`svelte-custom-renderer\` to its list of resolve
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(35);
 	} else {
 		throw new Error(`https://svelte.dev/e/custom_renderer_unavailable_on_server`);
 	}
@@ -34,6 +45,8 @@ export function experimental_async_required(name: string): never {
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(36);
 	} else {
 		throw new Error(`https://svelte.dev/e/experimental_async_required`);
 	}
@@ -49,6 +62,8 @@ export function invalid_default_snippet(): never {
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(37);
 	} else {
 		throw new Error(`https://svelte.dev/e/invalid_default_snippet`);
 	}
@@ -64,6 +79,8 @@ export function invalid_snippet_arguments(): never {
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(38);
 	} else {
 		throw new Error(`https://svelte.dev/e/invalid_snippet_arguments`);
 	}
@@ -79,6 +96,8 @@ export function invariant_violation(message: string): never {
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(39);
 	} else {
 		throw new Error(`https://svelte.dev/e/invariant_violation`);
 	}
@@ -94,6 +113,8 @@ export function lifecycle_outside_component(name: string): never {
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(40);
 	} else {
 		throw new Error(`https://svelte.dev/e/lifecycle_outside_component`);
 	}
@@ -109,6 +130,8 @@ export function missing_context(): never {
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(41);
 	} else {
 		throw new Error(`https://svelte.dev/e/missing_context`);
 	}
@@ -124,6 +147,8 @@ export function set_context_after_init(): never {
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(42);
 	} else {
 		throw new Error(`https://svelte.dev/e/set_context_after_init`);
 	}
@@ -139,6 +164,8 @@ export function snippet_without_render_tag(): never {
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(43);
 	} else {
 		throw new Error(`https://svelte.dev/e/snippet_without_render_tag`);
 	}
@@ -154,6 +181,8 @@ export function store_invalid_shape(name: string): never {
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(44);
 	} else {
 		throw new Error(`https://svelte.dev/e/store_invalid_shape`);
 	}
@@ -169,6 +198,8 @@ export function svelte_element_invalid_this_value(): never {
 		error.name = 'Svelte error';
 
 		throw error;
+	} else if (BROWSER) {
+		production_error(45);
 	} else {
 		throw new Error(`https://svelte.dev/e/svelte_element_invalid_this_value`);
 	}

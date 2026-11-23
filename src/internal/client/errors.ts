@@ -1,10 +1,64 @@
 // The errors of the client runtime. Svelte generates this module from `messages/client-errors`
-// with `scripts/process-messages`. This is that output with types added, and it has to stay
-// that: tests compare the texts, and the links lead to Svelte's documentation of each code.
+// with `scripts/process-messages`. This is that output with types added, and in dev it has to
+// stay that: tests compare the texts, and the links lead to Svelte's documentation of each code.
 // Every error is here, including those of features that svelte-lite leaves out: the modules
 // borrowed from Svelte import them by name.
+//
+// A production build throws a number in place of the name, to save bytes: the names do not
+// compress well. `https://svelte.dev/e/15` is `effect_update_depth_exceeded`, which Svelte
+// documents at https://svelte.dev/e/effect_update_depth_exceeded. This is the table to look a
+// number up in, for the errors here (1 to 34) and those in `../shared/errors.ts` (35 to 45).
+// A number is never given to another error: a new error takes the next free one, in whichever
+// of the two files it is.
+//
+//  1  async_derived_orphan
+//  2  bind_invalid_checkbox_value
+//  3  bind_invalid_export
+//  4  bind_not_bindable
+//  5  component_api_changed
+//  6  component_api_invalid_new
+//  7  custom_renderer_unsupported_operation
+//  8  derived_references_self
+//  9  each_key_duplicate
+// 10  each_key_volatile
+// 11  effect_in_teardown
+// 12  effect_in_unowned_derived
+// 13  effect_orphan
+// 14  effect_pending_outside_reaction
+// 15  effect_update_depth_exceeded
+// 16  flush_sync_in_effect
+// 17  fork_discarded
+// 18  fork_timing
+// 19  get_abort_signal_after_await
+// 20  get_abort_signal_outside_reaction
+// 21  hydratable_missing_but_required
+// 22  hydration_failed
+// 23  invalid_snippet
+// 24  invalid_snippet_in_custom_renderer
+// 25  lifecycle_legacy_only
+// 26  props_invalid_value
+// 27  props_rest_readonly
+// 28  renderer_cannot_cross
+// 29  rune_outside_svelte
+// 30  snippet_renderer_mismatch
+// 31  state_descriptors_fixed
+// 32  state_prototype_fixed
+// 33  state_unsafe_mutation
+// 34  svelte_boundary_reset_onerror
+// 35  custom_renderer_unavailable_on_server
+// 36  experimental_async_required
+// 37  invalid_default_snippet
+// 38  invalid_snippet_arguments
+// 39  invariant_violation
+// 40  lifecycle_outside_component
+// 41  missing_context
+// 42  set_context_after_init
+// 43  snippet_without_render_tag
+// 44  store_invalid_shape
+// 45  svelte_element_invalid_this_value
 
 import { DEV } from 'esm-env';
+import { production_error } from '../shared/errors.ts';
 
 export * from '../shared/errors.ts';
 
@@ -19,7 +73,7 @@ export function async_derived_orphan(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/async_derived_orphan`);
+		production_error(1);
 	}
 }
 
@@ -34,7 +88,7 @@ export function bind_invalid_checkbox_value(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/bind_invalid_checkbox_value`);
+		production_error(2);
 	}
 }
 
@@ -49,7 +103,7 @@ export function bind_invalid_export(component: string, key: string, name: string
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/bind_invalid_export`);
+		production_error(3);
 	}
 }
 
@@ -64,7 +118,7 @@ export function bind_not_bindable(key: string, component: string, name: string):
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/bind_not_bindable`);
+		production_error(4);
 	}
 }
 
@@ -79,7 +133,7 @@ export function component_api_changed(method: string, component: string): never 
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/component_api_changed`);
+		production_error(5);
 	}
 }
 
@@ -94,7 +148,7 @@ export function component_api_invalid_new(component: string, name: string): neve
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/component_api_invalid_new`);
+		production_error(6);
 	}
 }
 
@@ -109,7 +163,7 @@ export function custom_renderer_unsupported_operation(operation: string): never 
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/custom_renderer_unsupported_operation`);
+		production_error(7);
 	}
 }
 
@@ -124,7 +178,7 @@ export function derived_references_self(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/derived_references_self`);
+		production_error(8);
 	}
 }
 
@@ -141,7 +195,7 @@ export function each_key_duplicate(a: string, b: string, value?: string | null):
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/each_key_duplicate`);
+		production_error(9);
 	}
 }
 
@@ -156,7 +210,7 @@ export function each_key_volatile(index: string, a: string, b: string): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/each_key_volatile`);
+		production_error(10);
 	}
 }
 
@@ -171,7 +225,7 @@ export function effect_in_teardown(rune: string): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/effect_in_teardown`);
+		production_error(11);
 	}
 }
 
@@ -186,7 +240,7 @@ export function effect_in_unowned_derived(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/effect_in_unowned_derived`);
+		production_error(12);
 	}
 }
 
@@ -201,7 +255,7 @@ export function effect_orphan(rune: string): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/effect_orphan`);
+		production_error(13);
 	}
 }
 
@@ -216,7 +270,7 @@ export function effect_pending_outside_reaction(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/effect_pending_outside_reaction`);
+		production_error(14);
 	}
 }
 
@@ -231,7 +285,7 @@ export function effect_update_depth_exceeded(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/effect_update_depth_exceeded`);
+		production_error(15);
 	}
 }
 
@@ -246,7 +300,7 @@ export function flush_sync_in_effect(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/flush_sync_in_effect`);
+		production_error(16);
 	}
 }
 
@@ -261,7 +315,7 @@ export function fork_discarded(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/fork_discarded`);
+		production_error(17);
 	}
 }
 
@@ -276,7 +330,7 @@ export function fork_timing(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/fork_timing`);
+		production_error(18);
 	}
 }
 
@@ -291,7 +345,7 @@ export function get_abort_signal_after_await(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/get_abort_signal_after_await`);
+		production_error(19);
 	}
 }
 
@@ -306,7 +360,7 @@ export function get_abort_signal_outside_reaction(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/get_abort_signal_outside_reaction`);
+		production_error(20);
 	}
 }
 
@@ -321,7 +375,7 @@ export function hydratable_missing_but_required(key: string): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/hydratable_missing_but_required`);
+		production_error(21);
 	}
 }
 
@@ -336,7 +390,7 @@ export function hydration_failed(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/hydration_failed`);
+		production_error(22);
 	}
 }
 
@@ -351,7 +405,7 @@ export function invalid_snippet(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/invalid_snippet`);
+		production_error(23);
 	}
 }
 
@@ -366,7 +420,7 @@ export function invalid_snippet_in_custom_renderer(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/invalid_snippet_in_custom_renderer`);
+		production_error(24);
 	}
 }
 
@@ -381,7 +435,7 @@ export function lifecycle_legacy_only(name: string): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/lifecycle_legacy_only`);
+		production_error(25);
 	}
 }
 
@@ -396,7 +450,7 @@ export function props_invalid_value(key: string): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/props_invalid_value`);
+		production_error(26);
 	}
 }
 
@@ -411,7 +465,7 @@ export function props_rest_readonly(property: string): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/props_rest_readonly`);
+		production_error(27);
 	}
 }
 
@@ -426,7 +480,7 @@ export function renderer_cannot_cross(guest: string, host: string): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/renderer_cannot_cross`);
+		production_error(28);
 	}
 }
 
@@ -441,7 +495,7 @@ export function rune_outside_svelte(rune: string): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/rune_outside_svelte`);
+		production_error(29);
 	}
 }
 
@@ -456,7 +510,7 @@ export function snippet_renderer_mismatch(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/snippet_renderer_mismatch`);
+		production_error(30);
 	}
 }
 
@@ -471,7 +525,7 @@ export function state_descriptors_fixed(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/state_descriptors_fixed`);
+		production_error(31);
 	}
 }
 
@@ -486,7 +540,7 @@ export function state_prototype_fixed(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/state_prototype_fixed`);
+		production_error(32);
 	}
 }
 
@@ -501,7 +555,7 @@ export function state_unsafe_mutation(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/state_unsafe_mutation`);
+		production_error(33);
 	}
 }
 
@@ -516,6 +570,6 @@ export function svelte_boundary_reset_onerror(): never {
 
 		throw error;
 	} else {
-		throw new Error(`https://svelte.dev/e/svelte_boundary_reset_onerror`);
+		production_error(34);
 	}
 }
