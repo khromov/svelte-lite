@@ -22,17 +22,16 @@ import { set_attribute as set_attribute_op } from '../operations.ts';
 import { queue_micro_task } from '../task.ts';
 import { create_event } from './events.ts';
 import { add_form_reset_listener, autofocus } from './misc.ts';
-import { set_style } from './style.ts';
 
 /**
- * What a spread is given: attributes by name, plus `CLASS` and `STYLE` by symbol. Of those,
- * `STYLE` is applied. `CLASS` and attachments, which are under symbols too
- * (`createAttachmentKey()`), are not
+ * What a spread is given: attributes by name, plus `CLASS`, `STYLE` and attachments
+ * (`createAttachmentKey()`) by symbol. Only what is under a name is applied
  */
 type Attributes = Record<string | symbol, any>;
 
 /** The key the compiler puts the `class:` directives of an element with a spread under */
 export const CLASS = Symbol('class');
+/** The key the compiler puts the `style:` directives of an element with a spread under */
 export const STYLE = Symbol('style');
 
 const IS_CUSTOM_ELEMENT = Symbol('is custom element');
@@ -278,13 +277,10 @@ function set_attributes(
 		}
 
 		if (css_hash) {
-			// `class` is a string like any other attribute here, with the hash that scopes the
-			// component's styles added to it. Objects, arrays and `class:` directives are not applied
+			// `class` is a string like any other attribute here (and so is `style`), with the hash
+			// that scopes the component's styles added to it. Objects, arrays and `class:` directives
+			// are not applied
 			next.class = next.class ? next.class + ' ' + css_hash : css_hash;
-		}
-
-		if (next[STYLE]) {
-			next.style ??= null; /* force call to set_style() */
 		}
 
 		var setters = get_setters(element);
@@ -302,13 +298,6 @@ function set_attributes(
 		for (const key in next) {
 			// let instead of var because referenced in a closure
 			let value = next[key];
-
-			if (key === 'style') {
-				set_style(element, value, prev?.[STYLE], next[STYLE]);
-				current[key] = value;
-				current[STYLE] = next[STYLE];
-				continue;
-			}
 
 			var prev_value = current[key];
 
@@ -376,7 +365,7 @@ function set_attributes(
 
 				var is_default = name === 'defaultValue' || name === 'defaultChecked';
 
-				if (value == null && !is_custom_element && !is_default) {
+				if (value == null && (!is_custom_element || key === 'style') && !is_default) {
 					attributes[key] = null;
 
 					if (name === 'value') {
@@ -395,7 +384,10 @@ function set_attributes(
 					}
 				} else if (
 					is_default ||
-					((is_custom_element || typeof value !== 'string') && setters.has(name))
+					// `style` goes through its setter, as a string: a content security policy
+					// can forbid the attribute
+					((is_custom_element || typeof value !== 'string' || key === 'style') &&
+						setters.has(name))
 				) {
 					node[name] = value;
 					// remove it from attributes's cache
