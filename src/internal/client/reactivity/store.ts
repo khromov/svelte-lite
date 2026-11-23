@@ -120,9 +120,19 @@ export function invalidate_store(stores: StoreReferencesContainer, store_name: s
 }
 
 /**
+ * Whether a component that subscribes to a store with `$store` has been created. Nothing but
+ * `setup_stores` sets this, so that a bundler can tell that an app without such a component
+ * never has a prop that is bound to a store. (A component that binds a prop to `$store` calls
+ * `setup_stores` before it renders the child, so this is set by the time `prop` looks)
+ */
+export let has_stores = false;
+
+/**
  * Unsubscribes from all auto-subscribed stores on destroy
  */
 export function setup_stores(): [StoreReferencesContainer, () => void] {
+	has_stores = true;
+
 	const stores: StoreReferencesContainer = {};
 
 	function cleanup() {
