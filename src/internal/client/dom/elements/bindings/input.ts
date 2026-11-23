@@ -1,6 +1,6 @@
 import { DEV } from 'esm-env';
 import { render_effect, teardown } from '../../../reactivity/effects.ts';
-import { listen_to_event } from './shared.ts';
+import { listen_to_event_and_reset_event } from './shared.ts';
 import * as e from '../../../errors.ts';
 import { is } from '../../../proxy.ts';
 import { queue_micro_task } from '../../task.ts';
@@ -15,19 +15,20 @@ export function bind_value(
 	get: () => unknown,
 	set: (value: unknown) => void = get
 ): void {
-	listen_to_event(input, 'input', () => {
+	listen_to_event_and_reset_event(input, 'input', (is_reset) => {
 		if (DEV && input.type === 'checkbox') {
 			// TODO should this happen in prod too?
 			e.bind_invalid_checkbox_value();
 		}
 
-		set(is_numberlike_input(input) ? to_number(input.value) : input.value);
+		var value = is_reset ? input.defaultValue : input.value;
+		set(is_numberlike_input(input) ? to_number(value) : value);
 
 		// Svelte waits a tick here, and if `get()` then gives something else than what was
 		// typed (the setter changed or refused it), writes that back to the input and restores
 		// the selection. That is left out, with the `tick` and `flushSync` it needs: the effect
 		// below writes to the input when the bound value changes, and until then the input
-		// keeps what was typed
+		// keeps what was typed, or the default that a reset gave it
 	});
 
 	if (
@@ -98,10 +99,13 @@ export function bind_group(
 
 	binding_group.push(input);
 
-	listen_to_event(input, 'change', () => {
+	listen_to_event_and_reset_event(input, 'change', (is_reset) => {
 		var value = input.__value;
 
-		if (is_checkbox) {
+		if (is_reset) {
+			// TODO better default value handling
+			value = is_checkbox ? [] : null;
+		} else if (is_checkbox) {
 			value = get_binding_group_value(binding_group, value, input.checked);
 		}
 
@@ -165,8 +169,8 @@ export function bind_checked(
 	get: () => unknown,
 	set: (value: unknown) => void = get
 ): void {
-	listen_to_event(input, 'change', () => {
-		set(input.checked);
+	listen_to_event_and_reset_event(input, 'change', (is_reset) => {
+		set(is_reset ? input.defaultChecked : input.checked);
 	});
 
 	if (
@@ -215,7 +219,14 @@ export function bind_files(
 	get: () => FileList | null,
 	set: (value: FileList | null) => void = get
 ): void {
-	listen_to_event(input, 'change', () => {
+	listen_to_event_and_reset_event(input, 'change', (is_reset) => {
+		// A form reset can empty the input's `FileList` in place, which is then the very
+		// object the binding already holds and would not be seen as a change: give the
+		// input a new, empty one instead
+		if (is_reset && typeof DataTransfer === 'function') {
+			input.files = new DataTransfer().files;
+		}
+
 		set(input.files);
 	});
 
