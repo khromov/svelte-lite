@@ -29,7 +29,7 @@ import {
 	unfreeze_derived_effects,
 	update_derived
 } from './reactivity/deriveds.ts';
-import { tracing_mode_flag } from '../flags/index.ts';
+import { async_mode_flag, tracing_mode_flag } from '../flags/index.ts';
 import { tracing_expressions } from './dev/tracing.ts';
 import { get_error } from '../shared/dev.ts';
 import {
@@ -81,8 +81,17 @@ export function set_active_effect(effect: Effect | null): void {
  */
 export let current_sources: Set<Value> | null = null;
 
+/**
+ * With `experimental.async`, an effect does depend on the state it creates. svelte-lite leaves
+ * that feature out and nothing in it sets the flag, so that a bundler takes it to be `false` and
+ * this costs nothing. It is read here because Svelte's signals suite sets it to check exactly this
+ */
 export function push_reaction_value(value: Value): void {
-	if (active_reaction !== null && (active_reaction.f & REACTION_IS_UPDATING) !== 0) {
+	if (
+		!async_mode_flag &&
+		active_reaction !== null &&
+		(active_reaction.f & REACTION_IS_UPDATING) !== 0
+	) {
 		(current_sources ??= new Set()).add(value);
 	}
 }
