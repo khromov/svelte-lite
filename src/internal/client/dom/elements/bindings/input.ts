@@ -5,7 +5,7 @@ import * as e from '../../../errors.ts';
 import { is } from '../../../proxy.ts';
 import { queue_micro_task } from '../../task.ts';
 import { hydrating } from '../../hydration.ts';
-import { tick, untrack } from '../../../runtime.ts';
+import { untrack } from '../../../runtime.ts';
 
 /** `__value` is where compiled code and attribute spreading keep the `value` of an input, as it was given */
 type Input = HTMLInputElement & { __value?: unknown };
@@ -15,43 +15,19 @@ export function bind_value(
 	get: () => unknown,
 	set: (value: unknown) => void = get
 ): void {
-	listen_to_event(input, 'input', async () => {
+	listen_to_event(input, 'input', () => {
 		if (DEV && input.type === 'checkbox') {
 			// TODO should this happen in prod too?
 			e.bind_invalid_checkbox_value();
 		}
 
-		var value: any = input.value;
-		value = is_numberlike_input(input) ? to_number(value) : value;
-		set(value);
+		set(is_numberlike_input(input) ? to_number(input.value) : input.value);
 
-		// Because `{#each ...}` blocks work by updating sources inside the flush,
-		// we need to wait a tick before checking to see if we should forcibly
-		// update the input and reset the selection state
-		await tick();
-
-		// Respect any validation in accessors
-		if (value !== (value = get())) {
-			var start = input.selectionStart;
-			var end = input.selectionEnd;
-			var length = input.value.length;
-
-			// the value is coerced on assignment
-			input.value = value ?? '';
-
-			// Restore selection
-			if (end !== null) {
-				var new_length = input.value.length;
-				// If cursor was at end and new input is longer, move cursor to new end
-				if (start === end && end === length && new_length > length) {
-					input.selectionStart = new_length;
-					input.selectionEnd = new_length;
-				} else {
-					input.selectionStart = start;
-					input.selectionEnd = Math.min(end, new_length);
-				}
-			}
-		}
+		// Svelte waits a tick here, and if `get()` then gives something else than what was
+		// typed (the setter changed or refused it), writes that back to the input and restores
+		// the selection. That is left out, with the `tick` and `flushSync` it needs: the effect
+		// below writes to the input when the bound value changes, and until then the input
+		// keeps what was typed
 	});
 
 	if (
@@ -75,9 +51,8 @@ export function bind_value(
 
 		// Svelte returns here for a focused input while the batch that its own `input` event
 		// started is flushed, so that a pending async batch cannot overwrite what is being
-		// typed. That is left out with async. One thing differs because of it: a value that
-		// the setter coerced is written below, before the handler above gets to restore the
-		// selection around it, so the caret ends up at the end of the input
+		// typed. That is left out with async, so a value that the setter coerced is written
+		// below, and the caret ends up at the end of the input
 
 		if (is_numberlike_input(input) && value === to_number(input.value)) {
 			// handles 0 vs 00 case (see https://github.com/sveltejs/svelte/issues/9959)
