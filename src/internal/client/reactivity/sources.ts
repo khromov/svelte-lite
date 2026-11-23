@@ -10,7 +10,9 @@ import {
 	untracking,
 	push_reaction_value,
 	increment_write_version,
-	write_version
+	write_version,
+	is_destroying_effect,
+	old_values
 } from '../runtime.ts';
 import { equals } from './equality.ts';
 import {
@@ -118,8 +120,18 @@ export function internal_set<V>(source: Value<V>, value: V): V {
 			update_derived_status(source as Derived<V>);
 		}
 
+		var previous = source.v;
 		source.v = value;
 		source.wv = increment_write_version();
+
+		// what a teardown sees (see `old_values`): the value from before the change, or what a
+		// teardown wrote
+		if (is_destroying_effect) {
+			old_values.set(source, { v: value, wv: Infinity });
+		} else if (!old_values.has(source)) {
+			old_values.set(source, { v: previous, wv: source.wv });
+			schedule_flush();
+		}
 
 		if (DEV) {
 			if (tracing_mode_flag || active_effect !== null) {

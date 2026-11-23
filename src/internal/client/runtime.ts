@@ -57,6 +57,24 @@ import { without_reactive_context } from './dom/elements/bindings/shared.ts';
 
 export let is_destroying_effect = false;
 
+/**
+ * What a teardown sees. An effect's cleanup, `onDestroy` and the cleanup of an action or
+ * attachment mostly run because of a change, and read the world from before it: for each
+ * source written since the last flush ended, the value it had before its first write (`v`)
+ * and the version of that write (`wv`). A teardown sees `v` when that write came after its
+ * effect last ran (`teardown_version`), and the current value otherwise. A write in a teardown
+ * is seen by every teardown after it. Cleared when a flush ends; a write that adds an entry
+ * makes sure that one is coming.
+ */
+export const old_values: Map<Value, { v: unknown; wv: number }> = new Map();
+
+/** The write version at the end of the last run of the effect whose teardown is running */
+export let teardown_version = 0;
+
+export function set_teardown_version(version: number): void {
+	teardown_version = version;
+}
+
 export function set_is_destroying_effect(value: boolean): void {
 	is_destroying_effect = value;
 }
@@ -507,6 +525,27 @@ export function get<V>(signal: Value<V>): V {
 		}
 	}
 
+	if (is_destroying_effect) {
+		var held = old_values.get(signal);
+
+		if (held !== undefined && held.wv > teardown_version) {
+			return held.v as V;
+		}
+
+		// A derived that is out of date, or that depends on what changed, is worked out again in
+		// the teardown's view of the world, by calling its function: a teardown has no active
+		// reaction, so nothing is tracked, and the derived itself (its value, its dependencies)
+		// stays as it is for the world after the change
+		if (
+			has_deriveds &&
+			(signal.f & DERIVED) !== 0 &&
+			((signal.f & CLEAN) === 0 || depends_on_old_values(signal as Derived))
+		) {
+			// (not kept: the teardown can still write to what it depends on)
+			return (signal as Derived<V>).fn();
+		}
+	}
+
 	if (has_deriveds && (signal.f & DERIVED) !== 0) {
 		var derived = signal as Derived<V>;
 
@@ -541,6 +580,24 @@ export function get<V>(signal: Value<V>): V {
 	}
 
 	return signal.v;
+}
+
+function depends_on_old_values(derived: Derived): boolean {
+	if (derived.v === UNINITIALIZED) return true; // it never ran, so assume the worst
+	if (derived.deps === null) return false;
+
+	for (const dep of derived.deps) {
+		var held = old_values.get(dep);
+
+		if (
+			(held !== undefined && held.wv > teardown_version) ||
+			((dep.f & DERIVED) !== 0 && depends_on_old_values(dep as Derived))
+		) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 /**
