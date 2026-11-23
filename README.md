@@ -132,8 +132,6 @@ are not affected by any of this.
 
 - `class` is a string. The object and array forms are not supported, and **`class:` directives
   on that element are not applied**. The same goes for `style` and `style:` directives.
-- An attachment passed through the spread is not applied, which includes `{@attach}` on a
-  component that spreads its props onto an element. `{@attach}` on the element itself works.
 - On a `<select>`, `value` does not select options, also not for `bind:value` on that select.
 - `autofocus` does not focus the element. On an `<input>`, `type` is not set before `value`,
   and a `value` or `checked` that becomes `undefined` does not reset the input.

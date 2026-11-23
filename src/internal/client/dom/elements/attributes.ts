@@ -1,5 +1,6 @@
 import { DEV } from 'esm-env';
-import { UNINITIALIZED } from '../../../../constants.ts';
+import type { Effect } from '../../types.ts';
+import { ATTACHMENT_KEY, UNINITIALIZED } from '../../../../constants.ts';
 import { is_capture_event } from '../../../../utils.ts';
 import { get_descriptors, get_prototype_of } from '../../../shared/utils.ts';
 import {
@@ -8,7 +9,7 @@ import {
 	IS_XHTML,
 	LOADING_ATTR_SYMBOL
 } from '../../constants.ts';
-import { expressions, managed } from '../../reactivity/effects.ts';
+import { branch, destroy_effect, expressions, managed } from '../../reactivity/effects.ts';
 import {
 	active_effect,
 	active_reaction,
@@ -20,12 +21,13 @@ import * as w from '../../warnings.ts';
 import { hydrating, set_hydrating } from '../hydration.ts';
 import { set_attribute as set_attribute_op } from '../operations.ts';
 import { queue_micro_task } from '../task.ts';
+import { attach } from './attachments.ts';
 import { create_event } from './events.ts';
 import { add_form_reset_listener } from './misc.ts';
 
 /**
  * What a spread is given: attributes by name, plus `CLASS`, `STYLE` and attachments
- * (`createAttachmentKey()`) by symbol. Only what is under a name is applied
+ * (`createAttachmentKey()`) by symbol. Of the symbols, only the attachments are applied
  */
 type Attributes = Record<string | symbol, any>;
 
@@ -352,15 +354,31 @@ export function attribute_effect(
 	// no other use for deriveds, does not get them from here
 	var values = sync && expressions(sync);
 	var prev: Attributes | undefined = undefined;
+	var effects: Record<symbol, Effect> = {};
 
 	managed(() => {
-		prev = set_attributes(
-			element,
-			prev,
-			values ? fn(...values.map(get)) : fn(),
-			css_hash,
-			skip_warning
-		);
+		var next = values ? fn(...values.map(get)) : fn();
+		var current = set_attributes(element, prev, next, css_hash, skip_warning);
+
+		// An attachment arrives under a `createAttachmentKey()` symbol: `{@attach ...}` on a
+		// component that spreads its props onto the element, or an object made to be spread,
+		// such as SvelteKit's remote `form()`. Each runs until it is replaced or goes away
+		for (let symbol of Object.getOwnPropertySymbols(effects)) {
+			if (!next[symbol]) destroy_effect(effects[symbol]);
+		}
+
+		for (let symbol of Object.getOwnPropertySymbols(next)) {
+			var n = next[symbol];
+
+			if (symbol.description === ATTACHMENT_KEY && (!prev || n !== prev[symbol])) {
+				if (effects[symbol]) destroy_effect(effects[symbol]);
+				effects[symbol] = branch(() => attach(element, () => n));
+			}
+
+			current[symbol] = n;
+		}
+
+		prev = current;
 	});
 }
 
