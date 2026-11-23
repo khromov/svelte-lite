@@ -26,10 +26,11 @@ import { attach } from './attachments.ts';
 import { set_class } from './class.ts';
 import { create_event } from './events.ts';
 import { add_form_reset_listener } from './misc.ts';
+import { set_style } from './style.ts';
 
 /**
  * What a spread is given: attributes by name, plus `CLASS`, `STYLE` and attachments
- * (`createAttachmentKey()`) by symbol. Of the symbols, `STYLE` is not applied
+ * (`createAttachmentKey()`) by symbol
  */
 type Attributes = Record<string | symbol, any>;
 
@@ -43,8 +44,12 @@ let class_key: symbol | undefined;
 
 /** The key the compiler puts the `class:` directives of an element with a spread under */
 export const CLASS = /* @__PURE__ */ (() => (class_key = Symbol('class')))();
+
+/** `STYLE`, once it exists. As `class_key`, for an element with a spread and `style:` directives */
+let style_key: symbol | undefined;
+
 /** The key the compiler puts the `style:` directives of an element with a spread under */
-export const STYLE = Symbol('style');
+export const STYLE = /* @__PURE__ */ (() => (style_key = Symbol('style')))();
 
 const LINK_TAG = IS_XHTML ? 'link' : 'LINK';
 const PROGRESS_TAG = IS_XHTML ? 'progress' : 'PROGRESS';
@@ -247,8 +252,8 @@ export function set_custom_element_data(node: HTMLElement, prop: string, value: 
  * value is not a string) or an attribute, and `null` or `undefined` removes the attribute.
  * No element is treated differently from another, and of the keys only `class`, `style` and
  * `value` are. `class` can be an object or an array, has the hash that scopes the component's
- * styles added and is merged with the `class:` directives of the element, as on an element
- * without a spread.
+ * styles added and is merged with the `class:` directives of the element, and `style` is merged
+ * with its `style:` directives, as on an element without a spread.
  * A key is used as it is written: `readonly` is the attribute and `readOnly` the property
  * @param next New attributes - this function mutates this object
  */
@@ -277,6 +282,12 @@ function set_attributes(
 		next.class = null; /* so that the loop gets to `class` */
 	}
 
+	var styles = style_key && next[style_key];
+
+	if (styles) {
+		next.style ??= null; /* so that the loop gets to `style` */
+	}
+
 	var setters = get_setters(element);
 
 	// since key is captured we use const
@@ -296,6 +307,14 @@ function set_attributes(
 			// Without directives there is nothing to toggle, and the string with the hash in it
 			// is an attribute like any other: `null`, which is what '' gives, removes it
 			value = to_class(value, css_hash);
+		}
+
+		// Without directives there is nothing to merge, and `style` is assigned as the string
+		// it is, further down
+		if (key === 'style' && styles) {
+			set_style(element, value, prev?.[style_key!], styles);
+			current[key] = value;
+			continue;
 		}
 
 		var prev_value = current[key];
