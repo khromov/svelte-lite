@@ -81,6 +81,8 @@ export function animation<P>(
 	get_fn: () => AnimateFn<P | undefined>,
 	get_params: (() => P) | null
 ): void {
+	set_has_transitions();
+
 	var effect = animation_effect_override ?? (active_effect as Effect);
 	var nodes = effect.nodes as EffectNodes;
 

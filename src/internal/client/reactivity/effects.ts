@@ -57,10 +57,11 @@ import { set_signal_status } from './status.ts';
 export let has_effects = false;
 
 /**
- * Whether an element with a `transition:`, `in:` or `out:` directive has been created. Nothing but
- * `transition` sets this, before it gives an effect its first transition, so that a bundler can
- * tell that an app without those directives never has a transition to play, to stop or to wait
- * for. Until it is set, `nodes.t` is `null` on every effect
+ * Whether an element with a `transition:`, `in:`, `out:` or `animate:` directive has been created.
+ * Nothing but `transition` and `animation` set this, before they give an effect its first
+ * transition or animation, so that a bundler can tell that an app without those directives never
+ * has a transition to play, to stop or to wait for, nor an item of an each block to animate.
+ * Until it is set, `nodes.t` and `nodes.a` are `null` on every effect
  */
 export let has_transitions = false;
 
