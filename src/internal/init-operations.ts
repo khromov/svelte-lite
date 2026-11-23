@@ -1,2 +1,3 @@
-// @borrowed from Svelte until svelte-lite has its own version of this module
-export * from '../../vendor/svelte/packages/svelte/src/internal/init-operations.js';
+import { init_operations } from './client/dom/operations.ts';
+
+init_operations();
