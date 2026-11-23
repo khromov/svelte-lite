@@ -346,7 +346,9 @@ function skip_to_branch(effect: Effect | null): Effect | null {
 }
 
 /**
- * Add, remove, or reorder items output by an each block as its input changes
+ * Add, remove, or reorder items output by an each block as its input changes.
+ * Svelte works out the smallest set of moves. This walks the new order instead, and moves every
+ * item that is not where the walk has got to in front of what is there
  */
 function reconcile<V>(
 	state: EachState,
@@ -361,30 +363,38 @@ function reconcile<V>(
 	var items = state.items;
 	var current = skip_to_branch(state.effect.first);
 
-	var seen: undefined | Set<Effect>;
-
-	var prev: Effect | null = null;
-
 	var to_animate: undefined | Set<Effect>;
 
-	var matched: Effect[] = [];
+	var to_destroy: Effect[] = [];
 
-	var stashed: Effect[] = [];
-
-	var value: V;
-
-	var key: any;
+	/** The effects of the items that stay or come in, in their new order */
+	var kept = new Set<Effect>();
 
 	var effect: Effect;
 
 	var i: number;
 
-	if (is_animated) {
-		for (i = 0; i < length; i += 1) {
-			value = array[i];
-			key = get_key(value, i);
-			effect = (items.get(key) as EachItem).e;
+	for (i = 0; i < length; i += 1) {
+		kept.add((items.get(get_key(array[i], i)) as EachItem).e);
+	}
 
+	/**
+	 * Pass over what is going away, from where the walk has got to. It stays where it is:
+	 * it may have a transition to play, and moving the items that stay around it costs more
+	 */
+	function skip() {
+		while (current !== null && !kept.has(current)) {
+			// If the each block isn't inert, then inert effects are currently outroing and will be removed once the transition is finished
+			if ((current.f & INERT) === 0 && current !== state.fallback) {
+				to_destroy.push(current);
+			}
+
+			current = skip_to_branch(current.next);
+		}
+	}
+
+	if (is_animated) {
+		for (effect of kept) {
 			// offscreen == coming in now, no animation in that case,
 			// else this would happen https://github.com/sveltejs/svelte/issues/17181
 			if ((effect.f & EFFECT_OFFSCREEN) === 0) {
@@ -394,12 +404,7 @@ function reconcile<V>(
 		}
 	}
 
-	for (i = 0; i < length; i += 1) {
-		value = array[i];
-		key = get_key(value, i);
-
-		effect = (items.get(key) as EachItem).e;
-
+	for (effect of kept) {
 		if (state.outrogroups !== null) {
 			for (const group of state.outrogroups) {
 				group.pending.delete(effect);
@@ -415,100 +420,33 @@ function reconcile<V>(
 			}
 		}
 
-		if ((effect.f & EFFECT_OFFSCREEN) !== 0) {
+		var offscreen = (effect.f & EFFECT_OFFSCREEN) !== 0;
+
+		if (offscreen) {
+			// a new item goes where the walk has got to, in front of anything there that is going away
 			effect.f ^= EFFECT_OFFSCREEN;
-
-			if (effect === current) {
-				move(effect, null, anchor);
-			} else {
-				var next = prev ? prev.next : current;
-
-				if (effect === state.effect.last) {
-					state.effect.last = effect.prev;
-				}
-
-				if (effect.prev) effect.prev.next = effect.next;
-				if (effect.next) effect.next.prev = effect.prev;
-				link(state, prev, effect);
-				link(state, effect, next);
-
-				move(effect, next, anchor);
-				prev = effect;
-
-				matched = [];
-				stashed = [];
-
-				current = skip_to_branch(prev.next);
-				continue;
-			}
+		} else if (effect !== current) {
+			skip();
 		}
 
 		if (effect !== current) {
-			if (seen !== undefined && seen.has(effect)) {
-				if (matched.length < stashed.length) {
-					// more efficient to move later items to the front
-					var start = stashed[0];
-					var j;
+			// (an item that is yet to be placed comes after `current`, which is therefore not `null`)
+			link(state, effect.prev, effect.next);
+			link(state, (current as Effect).prev, effect);
+			link(state, effect, current);
 
-					prev = start.prev;
+			move(effect, current, anchor);
+		} else {
+			current = skip_to_branch(effect.next);
 
-					var a = matched[0];
-					var b = matched[matched.length - 1];
-
-					for (j = 0; j < matched.length; j += 1) {
-						move(matched[j], start, anchor);
-					}
-
-					for (j = 0; j < stashed.length; j += 1) {
-						seen.delete(stashed[j]);
-					}
-
-					link(state, a.prev, b.next);
-					link(state, prev, a);
-					link(state, b, start);
-
-					current = start;
-					prev = b;
-					i -= 1;
-
-					matched = [];
-					stashed = [];
-				} else {
-					// more efficient to move earlier items to the back
-					seen.delete(effect);
-					move(effect, current, anchor);
-
-					link(state, effect.prev, effect.next);
-					link(state, effect, prev === null ? state.effect.first : prev.next);
-					link(state, prev, effect);
-
-					prev = effect;
-				}
-
-				continue;
-			}
-
-			matched = [];
-			stashed = [];
-
-			while (current !== null && current !== effect) {
-				(seen ??= new Set()).add(current);
-				stashed.push(current);
-				current = skip_to_branch(current.next);
-			}
-
-			if (current === null) {
-				continue;
-			}
+			// (new items come last, so there is nothing after this one that is in the DOM)
+			if (offscreen) move(effect, current, anchor);
 		}
-
-		if ((effect.f & EFFECT_OFFSCREEN) === 0) {
-			matched.push(effect);
-		}
-
-		prev = effect;
-		current = skip_to_branch(effect.next);
 	}
+
+	// What is left is not in the new order. (This comes before the outro groups are tidied up,
+	// which can destroy `current`, and with that the way to what follows it)
+	skip();
 
 	if (state.outrogroups !== null) {
 		for (const group of state.outrogroups) {
@@ -523,43 +461,22 @@ function reconcile<V>(
 		}
 	}
 
-	if (current !== null || seen !== undefined) {
-		var to_destroy: Effect[] = [];
+	var destroy_length = to_destroy.length;
 
-		if (seen !== undefined) {
-			for (effect of seen) {
-				if ((effect.f & INERT) === 0) {
-					to_destroy.push(effect);
-				}
+	if (destroy_length > 0) {
+		var controlled_anchor = (flags & EACH_IS_CONTROLLED) !== 0 && length === 0 ? anchor : null;
+
+		if (is_animated) {
+			for (i = 0; i < destroy_length; i += 1) {
+				to_destroy[i].nodes?.a?.measure();
+			}
+
+			for (i = 0; i < destroy_length; i += 1) {
+				to_destroy[i].nodes?.a?.fix();
 			}
 		}
 
-		while (current !== null) {
-			// If the each block isn't inert, then inert effects are currently outroing and will be removed once the transition is finished
-			if ((current.f & INERT) === 0 && current !== state.fallback) {
-				to_destroy.push(current);
-			}
-
-			current = skip_to_branch(current.next);
-		}
-
-		var destroy_length = to_destroy.length;
-
-		if (destroy_length > 0) {
-			var controlled_anchor = (flags & EACH_IS_CONTROLLED) !== 0 && length === 0 ? anchor : null;
-
-			if (is_animated) {
-				for (i = 0; i < destroy_length; i += 1) {
-					to_destroy[i].nodes?.a?.measure();
-				}
-
-				for (i = 0; i < destroy_length; i += 1) {
-					to_destroy[i].nodes?.a?.fix();
-				}
-			}
-
-			pause_effects(state, to_destroy, controlled_anchor);
-		}
+		pause_effects(state, to_destroy, controlled_anchor);
 	}
 
 	if (is_animated) {
