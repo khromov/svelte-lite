@@ -314,3 +314,10 @@ test('SVELTE_IMPL selects the implementation', () => {
 	expect(get_impl({ SVELTE_IMPL: 'upstream' })).toBe('upstream');
 	expect(() => get_impl({ SVELTE_IMPL: 'svelte' })).toThrow();
 });
+
+test('names the version of Svelte whose compiler output it runs', async () => {
+	const { VERSION } = await import('../src/version.ts');
+
+	// src/version.ts holds the version as a literal, which has to follow the submodule
+	expect(VERSION).toBe(read_package(UPSTREAM_PKG).version);
+});
