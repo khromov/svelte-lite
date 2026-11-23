@@ -59,13 +59,13 @@ Gzipped, against Svelte 5.59.1:
 
 | App | svelte-lite | Svelte | |
 | --- | ---: | ---: | ---: |
-| A static page | 1,918 B | 12,037 B | −84% |
-| A counter | 2,900 B | 12,931 B | −78% |
-| The same, hydrated | 3,384 B | 13,653 B | −75% |
-| An element with spread attributes | 4,481 B | 16,547 B | −73% |
-| A keyed list | 5,333 B | 14,754 B | −64% |
-| A TodoMVC-style app, three components | 7,993 B | 18,196 B | −56% |
-| The same with a transition and an animation | 10,324 B | 20,050 B | −49% |
+| A static page | 1,921 B | 12,037 B | −84% |
+| A counter | 3,027 B | 12,931 B | −77% |
+| The same, hydrated | 3,513 B | 13,653 B | −74% |
+| A keyed list | 5,493 B | 14,754 B | −63% |
+| An element with spread attributes | 6,059 B | 16,547 B | −63% |
+| A TodoMVC-style app, three components | 8,268 B | 18,196 B | −55% |
+| The same with a transition and an animation | 10,595 B | 20,050 B | −47% |
 
 Transitions and animations are the clearest case of paying only for what is used: their
 plumbing in effects and `{#each}` is behind two flags that only `transition()` and
@@ -130,20 +130,20 @@ that any one of them can be reverted.
 **Spread attributes**
 
 On an element with a spread (`{...attrs}`, `...rest` props), and on a `<svelte:element>` with
-dynamic attributes, attributes are applied without special cases. Elements without a spread
-are not affected by any of this.
+dynamic attributes, `class`, `style`, attachments, the values of `<select>` and `<option>` and
+the names of attributes are handled as in Svelte. Inputs, `autofocus` and custom elements get
+no special treatment there. Elements without a spread are not affected by any of this.
 
-- `class` is a string. The object and array forms are not supported, and **`class:` directives
-  on that element are not applied**. The same goes for `style` and `style:` directives.
-- On a `<select>`, `value` does not select options, also not for `bind:value` on that select.
-- `autofocus` does not focus the element. On an `<input>`, `type` is not set before `value`,
-  and a `value` or `checked` that becomes `undefined` does not reset the input.
-- Keys are used as written. `{...{ readonly: false }}` sets `readonly="false"`, which makes
-  the input read-only: write `readOnly: false`.
+- `autofocus` does not focus the element.
+- On an `<input>`, `type` is not set before `value`: the order of the keys decides. A `value`
+  or `checked` that becomes `undefined` does not reset the input: pass `''` or `false`.
+  When hydrating, the `value` and `checked` attributes the server rendered stay, so a form
+  reset goes back to them.
+- A custom element is treated like any other element: a string is set as an attribute, also
+  when the element has a property of that name.
 
 **Bindings and actions**
 
-- Bound state does not follow `form.reset()`. Set it in an `onreset` handler.
 - A `bind:value` setter that refuses or changes what was typed is not written back to the
   input right away. A setter that produces a new value (`(v) => (text = v.toUpperCase())`)
   shows it, with the caret at the end of the input.
