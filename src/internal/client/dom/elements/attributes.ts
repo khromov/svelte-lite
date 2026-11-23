@@ -10,7 +10,13 @@ import {
 	IS_XHTML,
 	LOADING_ATTR_SYMBOL
 } from '../../constants.ts';
-import { branch, destroy_effect, expressions, managed } from '../../reactivity/effects.ts';
+import {
+	branch,
+	destroy_effect,
+	effect,
+	expressions,
+	managed
+} from '../../reactivity/effects.ts';
 import {
 	active_effect,
 	active_reaction,
@@ -23,6 +29,12 @@ import { hydrating, set_hydrating } from '../hydration.ts';
 import { set_attribute as set_attribute_op } from '../operations.ts';
 import { queue_micro_task } from '../task.ts';
 import { attach } from './attachments.ts';
+import {
+	init_select,
+	select_option,
+	set_default_select_value,
+	set_selected
+} from './bindings/select.ts';
 import { set_class } from './class.ts';
 import { create_event } from './events.ts';
 import { add_form_reset_listener } from './misc.ts';
@@ -250,19 +262,25 @@ export function set_custom_element_data(node: HTMLElement, prop: string, value: 
  * Spreads attributes onto a DOM element, taking into account the currently set attributes.
  * A key is an event handler (`on...`), a property (if the element has a setter for it and the
  * value is not a string) or an attribute, and `null` or `undefined` removes the attribute.
- * No element is treated differently from another, and of the keys only `class`, `style` and
- * `value` are. `class` can be an object or an array, has the hash that scopes the component's
- * styles added and is merged with the `class:` directives of the element, and `style` is merged
- * with its `style:` directives, as on an element without a spread.
+ * Of the keys, `class`, `style` and `value` are treated differently. `class` can be an object or
+ * an array, has the hash that scopes the component's styles added and is merged with the `class:`
+ * directives of the element, and `style` is merged with its `style:` directives, as on an element
+ * without a spread.
  * On an HTML element a key is matched in lower case, and as the property that goes by another
  * name where there is one: `readonly`, `readOnly` and `READONLY` are all the `readOnly` property.
- * Elsewhere (SVG, MathML) it is used as it is written
+ * Elsewhere (SVG, MathML) it is used as it is written.
+ * Of the elements, `<select>` and `<option>` are treated differently: the `value` and
+ * `defaultValue` of a select are for its options, which `attribute_effect` sees to, an option
+ * has '' for a value that is `null` or `undefined`, and its `selected` is the attribute.
+ * An `<input>` and a custom element are like any other element
  * @param next New attributes - this function mutates this object
  */
 function set_attributes(
 	element: Element & ElementCSSInlineStyle,
 	prev: Attributes | undefined,
 	next: Attributes,
+	is_html: boolean,
+	is_select: boolean,
 	css_hash?: string,
 	skip_warning = false
 ): Attributes {
@@ -291,12 +309,23 @@ function set_attributes(
 	}
 
 	var setters = get_setters(element);
-	var is_html = element.namespaceURI === NAMESPACE_HTML;
+	var is_option = is_html && element.localName === 'option';
 
 	// since key is captured we use const
 	for (const key in next) {
 		// let instead of var because referenced in a closure
 		let value = next[key];
+
+		// Up here because we want to do this for the initial value, too, even if it's undefined,
+		// and this wouldn't be reached in case of undefined because of the equality check below
+		if (is_option && key === 'value' && value == null) {
+			// Removing the `value` attribute of an `<option>` makes its text its value, and
+			// setting it to `null` or `undefined` gives the string "null" or "undefined". An
+			// option without a spread gets '' for those, and so does this one
+			(element as HTMLOptionElement).value = '';
+			current[key] = value;
+			continue;
+		}
 
 		if (key === 'class') {
 			if (classes) {
@@ -359,10 +388,21 @@ function set_attributes(
 
 				current[event_handle_key] = create_event(event_name, element, handle, opts);
 			}
+		} else if (key === 'selected' && is_option) {
+			set_selected(element as HTMLOptionElement, value);
 		} else {
 			// `{ readonly: false }` has to end up as the `readOnly` property: as an attribute it
 			// would be `readonly="false"`, which is read-only
 			var name = is_html ? normalize_attribute(key) : key;
+
+			if (is_select) {
+				// A select's default value is represented by selected options, not a property.
+				if (name === 'defaultValue') continue;
+
+				// What `init_select` selects again when the options change. Only a select gets
+				// this from a spread: an `<option>` or an `<input>` with one has no `__value`
+				if (key === 'value') (element as any).__value = value;
+			}
 
 			if (value == null) {
 				// (the cache of `set_attribute` is by the name it was given, which is `name`)
@@ -412,9 +452,22 @@ export function attribute_effect(
 	var prev: Attributes | undefined = undefined;
 	var effects: Record<symbol, Effect> = {};
 
+	var is_html = element.namespaceURI === NAMESPACE_HTML;
+
+	// Nothing in compiled code says that the element of a spread is a `<select>`, so every app
+	// with a spread has what follows from this. (`localName` is in lower case in an XHTML
+	// document too, where `nodeName` is not in upper case)
+	var is_select = is_html && element.localName === 'select';
+	var select = element as unknown as HTMLSelectElement;
+
 	managed(() => {
 		var next = values ? fn(...values.map(get)) : fn();
-		var current = set_attributes(element, prev, next, css_hash, skip_warning);
+		var current = set_attributes(element, prev, next, is_html, is_select, css_hash, skip_warning);
+
+		// (the first time, the options are not there yet: see below)
+		if (is_select && prev) {
+			select_from_spread(select, next);
+		}
 
 		// An attachment arrives under a `createAttachmentKey()` symbol: `{@attach ...}` on a
 		// component that spreads its props onto the element, or an object made to be spread,
@@ -436,6 +489,31 @@ export function attribute_effect(
 
 		prev = current;
 	});
+
+	if (is_select) {
+		// In an effect, so that it runs when the options, which are the children of the select
+		// and come after its attributes, are in place. Compiled code leaves `init_select` to
+		// the spread, also for a `bind:value` on the select
+		effect(() => {
+			select_from_spread(select, prev as Attributes, true);
+			init_select(select);
+		});
+	}
+}
+
+/**
+ * Selects the options that the `value` of a spread on a `<select>` asks for, and marks the ones
+ * its `defaultValue` asks for, which a form reset goes back to. When `mounting`, a select
+ * without a `value` keeps the selection it has
+ */
+function select_from_spread(select: HTMLSelectElement, attrs: Attributes, mounting = false) {
+	if ('defaultValue' in attrs) {
+		set_default_select_value(select, attrs.defaultValue);
+	}
+
+	if (mounting || 'value' in attrs) {
+		select_option(select, attrs.value, mounting);
+	}
 }
 
 function get_attributes(element: Element): Attributes {
