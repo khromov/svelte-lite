@@ -10,8 +10,13 @@ import {
 	IS_XHTML,
 	LOADING_ATTR_SYMBOL
 } from '../../constants.ts';
-import { flatten } from '../../reactivity/async.ts';
-import { branch, destroy_effect, effect, managed } from '../../reactivity/effects.ts';
+import {
+	branch,
+	destroy_effect,
+	effect,
+	expressions,
+	managed
+} from '../../reactivity/effects.ts';
 import {
 	active_effect,
 	active_reaction,
@@ -467,77 +472,76 @@ export function attribute_effect(
 	element: Element & ElementCSSInlineStyle,
 	fn: (...expressions: any) => Attributes,
 	sync: Array<() => any> = [],
-	async: Array<() => Promise<any>> = [],
-	blockers: Parameters<typeof flatten>[0] = [],
+	async?: unknown,
+	blockers?: unknown,
 	css_hash?: string,
 	should_remove_defaults = false,
 	skip_warning = false
 ): void {
-	flatten(blockers, sync, async, (values) => {
-		var prev: Attributes | undefined = undefined;
-		var effects: Record<symbol, Effect> = {};
+	var values = expressions(sync);
+	var prev: Attributes | undefined = undefined;
+	var effects: Record<symbol, Effect> = {};
 
-		var is_select = element.nodeName === SELECT_TAG;
-		var inited = false;
+	var is_select = element.nodeName === SELECT_TAG;
+	var inited = false;
 
-		managed(() => {
-			var next = fn(...values.map(get));
-			var current = set_attributes(
-				element,
-				prev,
-				next,
-				css_hash,
-				should_remove_defaults,
-				skip_warning
-			);
+	managed(() => {
+		var next = fn(...values.map(get));
+		var current = set_attributes(
+			element,
+			prev,
+			next,
+			css_hash,
+			should_remove_defaults,
+			skip_warning
+		);
 
-			if (inited && is_select) {
-				var select = element as HTMLSelectElement;
-
-				if ('defaultValue' in next) {
-					set_default_select_value(select, next.defaultValue);
-				}
-
-				if ('value' in next) {
-					select_option(select, next.value);
-				}
-			}
-
-			for (let symbol of Object.getOwnPropertySymbols(effects)) {
-				if (!next[symbol]) destroy_effect(effects[symbol]);
-			}
-
-			for (let symbol of Object.getOwnPropertySymbols(next)) {
-				var n = next[symbol];
-
-				if (symbol.description === ATTACHMENT_KEY && (!prev || n !== prev[symbol])) {
-					if (effects[symbol]) destroy_effect(effects[symbol]);
-					effects[symbol] = branch(() => attach(element, () => n));
-				}
-
-				current[symbol] = n;
-			}
-
-			prev = current;
-		});
-
-		if (is_select) {
+		if (inited && is_select) {
 			var select = element as HTMLSelectElement;
 
-			effect(() => {
-				var attrs = prev as Attributes;
+			if ('defaultValue' in next) {
+				set_default_select_value(select, next.defaultValue);
+			}
 
-				if ('defaultValue' in attrs) {
-					set_default_select_value(select, attrs.defaultValue);
-				}
-
-				select_option(select, attrs.value, true);
-				init_select(select);
-			});
+			if ('value' in next) {
+				select_option(select, next.value);
+			}
 		}
 
-		inited = true;
+		for (let symbol of Object.getOwnPropertySymbols(effects)) {
+			if (!next[symbol]) destroy_effect(effects[symbol]);
+		}
+
+		for (let symbol of Object.getOwnPropertySymbols(next)) {
+			var n = next[symbol];
+
+			if (symbol.description === ATTACHMENT_KEY && (!prev || n !== prev[symbol])) {
+				if (effects[symbol]) destroy_effect(effects[symbol]);
+				effects[symbol] = branch(() => attach(element, () => n));
+			}
+
+			current[symbol] = n;
+		}
+
+		prev = current;
 	});
+
+	if (is_select) {
+		var select = element as HTMLSelectElement;
+
+		effect(() => {
+			var attrs = prev as Attributes;
+
+			if ('defaultValue' in attrs) {
+				set_default_select_value(select, attrs.defaultValue);
+			}
+
+			select_option(select, attrs.value, true);
+			init_select(select);
+		});
+	}
+
+	inited = true;
 }
 
 function get_attributes(element: Element): Attributes {

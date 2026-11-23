@@ -3,11 +3,11 @@ import { DEV } from 'esm-env';
 import { HYDRATION_START_ELSE, UNINITIALIZED } from '../../../../constants.ts';
 import { is_promise } from '../../../shared/utils.ts';
 import { ASYNC, DESTROYED, EFFECT_PRESERVED } from '../../constants.ts';
-import { capture, unset_context } from '../../reactivity/async.ts';
-import { Batch, current_batch, flushSync, is_flushing_sync } from '../../reactivity/batch.ts';
+import { component_context, dev_stack, set_component_context, set_dev_stack } from '../../context.ts';
+import { flushSync, is_flushing_sync } from '../../reactivity/batch.ts';
 import { block } from '../../reactivity/effects.ts';
 import { internal_set, source } from '../../reactivity/sources.ts';
-import { active_effect } from '../../runtime.ts';
+import { active_effect, set_active_effect, set_active_reaction } from '../../runtime.ts';
 import {
 	hydrate_next,
 	hydrating,
@@ -38,12 +38,11 @@ export function await_block<V>(
 	var value = source(UNINITIALIZED as V);
 	var error = source<unknown>(UNINITIALIZED);
 
-	// Flagged like the result of an async expression, as in Svelte: the scheduler notes it
-	// with every write to them, and `$inspect.trace` reports them as `$derived`
-	value.f |= ASYNC;
-	error.f |= ASYNC;
-
 	if (DEV) {
+		// `$inspect.trace` reports what a promise settled with as `$derived`, as in Svelte
+		value.f |= ASYNC;
+		error.f |= ASYNC;
+
 		value.label = '{#await ...} value';
 		error.label = '{#await ...} error';
 	}
@@ -55,7 +54,6 @@ export function await_block<V>(
 
 	block(() => {
 		var effect = active_effect as Effect;
-		var batch = current_batch as Batch;
 		var input = get_input();
 		var run = (current = {});
 
@@ -69,31 +67,37 @@ export function await_block<V>(
 		}
 
 		if (is_promise(input)) {
-			var restore = capture();
+			var context = component_context;
 			var resolved = false;
 
+			if (DEV) {
+				var stack = dev_stack;
+			}
+
+			/** Selects a branch after the block ran, as if it was the block doing it */
 			const resolve = (fn: () => void) => {
 				if ((effect.f & DESTROYED) !== 0 || run !== current) return;
 
 				resolved = true;
 
-				// The context of the block is restored, but not its batch: the pending,
-				// resolved and failed states are each their own batch, so to speak
-				restore(null);
+				set_active_effect(effect);
+				set_active_reaction(effect);
+				set_component_context(context);
 
-				// ...but the batch that the block ran in can still be the current one here, if the promise is
-				// a thenable that settles right away, or if that batch has not been flushed yet
-				if (current_batch === batch) {
-					batch.deactivate();
+				if (DEV) {
+					set_dev_stack(stack);
 				}
-
-				// Make sure we have a batch, since the branch manager expects one to exist
-				Batch.ensure();
 
 				try {
 					fn();
 				} finally {
-					unset_context(false);
+					set_active_effect(null);
+					set_active_reaction(null);
+					set_component_context(null);
+
+					if (DEV) {
+						set_dev_stack(null);
+					}
 
 					// without this, the DOM does not update until two ticks after the promise
 					// resolves, which is unexpected behaviour (and somewhat irksome to test)

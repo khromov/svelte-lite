@@ -7,7 +7,6 @@ import type {
 	MaybeSource,
 	TemplateNode
 } from '../../types.ts';
-import type { Batch } from '../../reactivity/batch.ts';
 import {
 	EACH_INDEX_REACTIVE,
 	EACH_IS_ANIMATED,
@@ -30,14 +29,12 @@ import {
 	clear_text_content,
 	create_text,
 	get_first_child,
-	get_next_sibling,
-	should_defer_append
+	get_next_sibling
 } from '../operations.ts';
 import {
 	block,
 	branch,
 	destroy_effect,
-	move_effect,
 	pause_effect,
 	resume_effect
 } from '../../reactivity/effects.ts';
@@ -55,7 +52,6 @@ import { queue_micro_task } from '../task.ts';
 import { get } from '../../runtime.ts';
 import { DEV } from 'esm-env';
 import { derived_safe_equal } from '../../reactivity/deriveds.ts';
-import { current_batch } from '../../reactivity/batch.ts';
 import * as e from '../../errors.ts';
 import { tag } from '../../dev/tracing.ts';
 
@@ -90,7 +86,7 @@ function pause_effects(state: EachState, to_destroy: Effect[], controlled_anchor
 					if (group.pending.size === 0) {
 						var groups = state.outrogroups as Set<EachOutroGroup>;
 
-						destroy_effects(state, array_from(group.done));
+						destroy_effects(array_from(group.done));
 						groups.delete(group);
 
 						if (groups.size === 0) {
@@ -108,11 +104,8 @@ function pause_effects(state: EachState, to_destroy: Effect[], controlled_anchor
 	if (remaining === 0) {
 		// If we're in a controlled each block (i.e. the block is the only child of an
 		// element), and we are removing all items, _and_ there are no out transitions,
-		// we can use the fast path — emptying the element and replacing the anchor.
-		// Skip the fast path when another batch is still pending on this each block:
-		// that batch's keys still reference EachItems in `state.items`, which
-		// `destroy_effects` needs to preserve offscreen (see sveltejs/svelte#18610).
-		var fast_path = controlled_anchor !== null && state.pending.size === 0;
+		// we can use the fast path — emptying the element and replacing the anchor
+		var fast_path = controlled_anchor !== null;
 
 		if (fast_path) {
 			var anchor = controlled_anchor as Element;
@@ -124,7 +117,7 @@ function pause_effects(state: EachState, to_destroy: Effect[], controlled_anchor
 			state.items.clear();
 		}
 
-		destroy_effects(state, to_destroy, !fast_path);
+		destroy_effects(to_destroy, !fast_path);
 	} else {
 		group = {
 			pending: new Set(to_destroy),
@@ -135,52 +128,10 @@ function pause_effects(state: EachState, to_destroy: Effect[], controlled_anchor
 	}
 }
 
-function selected_effects(state: EachState): Set<Effect> {
-	var selected = new Set<Effect>();
-	// The loop-in-a-loop isn't ideal, but we should only hit this in relatively rare cases
-	for (const keys of state.pending.values()) {
-		for (const key of keys) {
-			selected.add((state.items.get(key) as EachItem).e);
-		}
-	}
-	return selected;
-}
-
-function destroy_effects(state: EachState, to_destroy: Effect[], remove_dom = true) {
-	var preserved_effects = state.pending.size > 0 ? selected_effects(state) : undefined;
-
+function destroy_effects(to_destroy: Effect[], remove_dom = true) {
 	for (var i = 0; i < to_destroy.length; i++) {
-		var e = to_destroy[i];
-
-		if (preserved_effects?.has(e)) {
-			e.f |= EFFECT_OFFSCREEN;
-
-			const fragment = document.createDocumentFragment();
-			move_effect(e, fragment);
-
-			// `reconcile` expects offscreen items to come after all onscreen items
-			if (e !== state.effect.last) {
-				link(state, e.prev, e.next);
-				link(state, state.effect.last, e);
-				link(state, e, null);
-			}
-		} else {
-			destroy_effect(to_destroy[i], remove_dom);
-		}
+		destroy_effect(to_destroy[i], remove_dom);
 	}
-}
-
-/**
- * Whether the item is outroing, i.e. `pause_effects` destroys it (or keeps it offscreen) once its outro is done
- */
-function is_outroing(state: EachState, effect: Effect) {
-	if (state.outrogroups !== null) {
-		for (const group of state.outrogroups) {
-			if (group.pending.has(effect) || group.done.has(effect)) return true;
-		}
-	}
-
-	return false;
 }
 
 /** Where items that are created after the first run render to, until `reconcile` moves them into place */
@@ -237,84 +188,7 @@ export function each<V>(
 		tag(each_array, '{#each ...}');
 	}
 
-	var pending = new Map<Batch, Set<any>>();
-
 	var first_run = true;
-
-	function commit(batch: Batch) {
-		if ((state.effect.f & DESTROYED) !== 0) {
-			return;
-		}
-
-		state.pending.delete(batch);
-
-		// The effect doesn't necessarily re-run in a batch right before that batch commits
-		// (its view of the collection may not have changed), so we read the collection
-		// as the committing batch sees it rather than using the most recent block run's result
-		var array = get(each_array);
-
-		state.fallback = fallback;
-		reconcile(state, array, anchor, flags, get_key);
-
-		if (fallback !== null) {
-			if (array.length === 0) {
-				if ((fallback.f & EFFECT_OFFSCREEN) === 0) {
-					resume_effect(fallback);
-				} else {
-					fallback.f ^= EFFECT_OFFSCREEN;
-					move(fallback, null, anchor);
-				}
-			} else {
-				pause_effect(fallback, () => {
-					// TODO only null out if no pending batch needs it,
-					// otherwise re-add `fallback.fragment` and move the
-					// effect into it
-					fallback = null;
-				});
-			}
-		}
-
-		destroy_unselected();
-	}
-
-	function discard(batch: Batch) {
-		state.pending.delete(batch);
-
-		if ((state.effect.f & DESTROYED) === 0) {
-			destroy_unselected();
-		}
-	}
-
-	/**
-	 * Destroys the offscreen items that no pending batch selects anymore. Offscreen items only exist
-	 * for the batches that select them: they were created in their view, or kept for them when a
-	 * commit removed them (see `destroy_effects`). A batch stops selecting an item when it's discarded,
-	 * or when its block runs again without it. `reconcile` doesn't destroy such an item if it was kept,
-	 * as kept items are paused, and it leaves paused items alone (taking them to be outroing)
-	 */
-	function destroy_unselected() {
-		var selected: Set<Effect> | undefined;
-		var effect = state.effect.last;
-
-		// offscreen items come after all onscreen items (see `destroy_effects`)
-		while (effect !== null) {
-			var prev = effect.prev;
-
-			// (an offscreen fallback isn't paused, so the next commit shows it or destroys it, see above)
-			if ((effect.f & BRANCH_EFFECT) !== 0 && effect !== fallback) {
-				if ((effect.f & EFFECT_OFFSCREEN) === 0) break;
-
-				// create lazily to save work in the common case
-				selected ??= selected_effects(state);
-
-				if (!selected.has(effect) && !is_outroing(state, effect)) {
-					destroy_effect(effect);
-				}
-			}
-
-			effect = prev;
-		}
-	}
 
 	var effect = block(() => {
 		var array = get(each_array);
@@ -337,8 +211,6 @@ export function each<V>(
 		}
 
 		var keys = new Set();
-		var batch = current_batch as Batch;
-		var defer = should_defer_append();
 
 		for (var index = 0; index < length; index += 1) {
 			if (
@@ -370,10 +242,6 @@ export function each<V>(
 				// update before reconciliation
 				if (item.v) internal_set(item.v, value);
 				if (item.i) internal_set(item.i, index);
-
-				if (defer) {
-					batch.unskip_effect(item.e);
-				}
 			} else {
 				item = create_item(
 					items,
@@ -387,9 +255,7 @@ export function each<V>(
 				);
 
 				if (!first_run) {
-					// until it is committed, the item only exists for the batches that select it
 					item.e.f |= EFFECT_OFFSCREEN;
-					if (defer) batch.unskip_new_effect(item.e);
 				}
 
 				items.set(key, item);
@@ -403,17 +269,7 @@ export function each<V>(
 				fallback = branch(() => fallback_fn(anchor));
 			} else {
 				fallback = branch(() => fallback_fn((offscreen_anchor ??= create_text())));
-				// until it is committed, the fallback only exists for the batches that select it
 				fallback.f |= EFFECT_OFFSCREEN;
-				if (defer) batch.unskip_new_effect(fallback);
-			}
-		}
-
-		if (defer && fallback !== null) {
-			if (length === 0) {
-				batch.unskip_effect(fallback);
-			} else {
-				batch.skip_effect(fallback);
 			}
 		}
 
@@ -431,20 +287,28 @@ export function each<V>(
 			set_hydrate_node(skip_nodes());
 		}
 
-		if (!first_run) {
-			pending.set(batch, keys);
+		// (creating an item can run code that destroys the block, by unmounting the app for example)
+		if (!first_run && (state.effect.f & DESTROYED) === 0) {
+			// Creating an item can also change the collection, so it is read
+			// again: an item that is no longer in it must not end up in the DOM
+			array = get(each_array);
 
-			if (defer) {
-				for (const [key, item] of items) {
-					if (!keys.has(key)) {
-						batch.skip_effect(item.e);
+			state.fallback = fallback;
+			reconcile(state, array, anchor, flags, get_key);
+
+			if (fallback !== null) {
+				if (array.length === 0) {
+					if ((fallback.f & EFFECT_OFFSCREEN) === 0) {
+						resume_effect(fallback);
+					} else {
+						fallback.f ^= EFFECT_OFFSCREEN;
+						move(fallback, null, anchor);
 					}
+				} else {
+					pause_effect(fallback, () => {
+						fallback = null;
+					});
 				}
-
-				batch.oncommit(commit);
-				batch.ondiscard(discard);
-			} else {
-				commit(batch);
 			}
 		}
 
@@ -462,7 +326,7 @@ export function each<V>(
 		get(each_array);
 	});
 
-	var state: EachState = { effect, flags, items, pending, outrogroups: null, fallback };
+	var state: EachState = { effect, flags, items, outrogroups: null, fallback };
 
 	first_run = false;
 
@@ -649,7 +513,7 @@ function reconcile<V>(
 	if (state.outrogroups !== null) {
 		for (const group of state.outrogroups) {
 			if (group.pending.size === 0) {
-				destroy_effects(state, array_from(group.done));
+				destroy_effects(array_from(group.done));
 				state.outrogroups?.delete(group);
 			}
 		}

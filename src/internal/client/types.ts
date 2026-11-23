@@ -1,6 +1,5 @@
 import type { Store } from '../shared/types.ts';
 import type { STATE_SYMBOL } from './constants.ts';
-import type { Batch } from './reactivity/batch.ts';
 import type { Effect, Source, Value } from './reactivity/types.ts';
 
 declare global {
@@ -91,8 +90,6 @@ export type EachState = {
 	flags: number;
 	/** a key -> item lookup */
 	items: Map<any, EachItem>;
-	/** a batch -> keys lookup of all keys that are still needed */
-	pending: Map<Batch, Set<any>>;
 	/** all outro groups that this item is a part of */
 	outrogroups: Set<EachOutroGroup> | null;
 	/** `{:else}` effect */

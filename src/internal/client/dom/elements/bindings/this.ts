@@ -55,8 +55,14 @@ export function bind_this(
 				p = p.parent;
 			}
 			const teardown = () => {
-				if (parts && is_bound_this(get_value(...parts), element_or_component)) {
-					update(null, ...parts);
+				try {
+					if (parts && is_bound_this(get_value(...parts), element_or_component)) {
+						update(null, ...parts);
+					}
+				} catch {
+					// A teardown reads state as it is now, and the state that led to where the element
+					// was bound can be gone: in `{#if item}<p bind:this={refs[item.id]}>`, this runs
+					// because `item` no longer is. There is nothing to reset then
 				}
 			};
 			const original_teardown = p.teardown;

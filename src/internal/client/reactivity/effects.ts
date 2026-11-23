@@ -5,7 +5,6 @@ import type {
 	TemplateNode,
 	TransitionManager
 } from '../types.ts';
-import type { Blocker } from './async.ts';
 import {
 	active_effect,
 	active_reaction,
@@ -15,9 +14,9 @@ import {
 	remove_reactions,
 	set_active_reaction,
 	set_is_destroying_effect,
-	teardown_version,
 	untracking,
-	abort_all
+	has_abort_signals,
+	abort_signal
 } from '../runtime.ts';
 import {
 	DIRTY,
@@ -33,10 +32,8 @@ import {
 	CLEAN,
 	EAGER_EFFECT,
 	HEAD_EFFECT,
-	MAYBE_DIRTY,
 	EFFECT_PRESERVED,
 	USER_EFFECT,
-	ASYNC,
 	CONNECTED,
 	MANAGED_EFFECT,
 	DESTROYING,
@@ -48,11 +45,20 @@ import { DEV } from 'esm-env';
 import { define_property } from '../../shared/utils.ts';
 import { get_next_sibling } from '../dom/operations.ts';
 import { component_context, dev_current_component_function, dev_stack } from '../context.ts';
-import { Batch, collected_effects, set_teardown_context, teardown_context } from './batch.ts';
-import { flatten } from './async.ts';
+import { collected_effects, schedule_effect } from './batch.ts';
+import { derived, has_deriveds } from './deriveds.ts';
 import { set_signal_status } from './status.ts';
-import { unsupported } from '../../../unsupported.ts';
 
+/**
+ * Whether an effect that waits for the DOM to be up to date (`$effect`, and what bindings, actions
+ * and transitions use) has been created. Nothing but the functions that create one set this, so
+ * that a bundler can tell that an app without such effects never has one to schedule or to run
+ */
+export let has_effects = false;
+
+/**
+ * Checks that a rune that creates an effect is used where it can. Only called in dev mode
+ */
 export function validate_effect(rune: '$effect' | '$effect.pre' | '$inspect'): void {
 	if (active_effect === null) {
 		if (active_reaction === null) {
@@ -95,8 +101,6 @@ function create_effect(type: number, fn: null | (() => void | (() => void))): Ef
 	var effect: Effect = {
 		ctx: component_context,
 		deps: null,
-		dv: null,
-		edges: null,
 		nodes: null,
 		f: type | DIRTY | CONNECTED,
 		first: null,
@@ -104,14 +108,9 @@ function create_effect(type: number, fn: null | (() => void | (() => void))): Ef
 		last: null,
 		next: null,
 		parent,
-		b: parent && parent.b,
 		prev: null,
 		teardown: null,
-		wv: 0,
-		ac: null,
-		// the renderer the effect was created with, which is always the DOM: svelte-lite
-		// has no custom renderers. The field is part of the shape of an effect
-		r: null
+		wv: 0
 	};
 
 	if (DEV) {
@@ -120,13 +119,13 @@ function create_effect(type: number, fn: null | (() => void | (() => void))): Ef
 
 	var e: Effect | null = effect;
 
-	if ((type & EFFECT) !== 0) {
+	if (has_effects && (type & EFFECT) !== 0) {
 		if (collected_effects !== null) {
-			// created during traversal — collect and run afterwards
+			// created while the tree is being traversed — it runs with the effects of this flush
 			collected_effects.push(effect);
 		} else {
 			// schedule for later
-			Batch.ensure().schedule(effect, DIRTY);
+			schedule_effect(effect);
 		}
 	} else if (fn !== null) {
 		try {
@@ -140,7 +139,7 @@ function create_effect(type: number, fn: null | (() => void | (() => void))): Ef
 		// won't re-run, has no DOM, and has no teardown etc)
 		// then we skip it and go to its child (if any)
 		if (
-			e.edges === null &&
+			e.deps === null &&
 			e.teardown === null &&
 			e.nodes === null &&
 			e.first === e.last && // either `null`, or a singular child
@@ -162,6 +161,7 @@ function create_effect(type: number, fn: null | (() => void | (() => void))): Ef
 
 		// if we're in a derived, add the effect there too
 		if (
+			has_deriveds &&
 			active_reaction !== null &&
 			(active_reaction.f & DERIVED) !== 0 &&
 			(type & ROOT_EFFECT) === 0
@@ -192,13 +192,15 @@ export function teardown(fn: () => void): Effect {
  * Internal representation of `$effect(...)`
  */
 export function user_effect(fn: () => void | (() => void)): void | Effect {
-	validate_effect('$effect');
-
 	if (DEV) {
+		validate_effect('$effect');
+
 		define_property(fn, 'name', {
 			value: '$effect'
 		});
 	}
+
+	has_effects = true;
 
 	// Non-nested `$effect(...)` in a component should be deferred
 	// until the component is mounted
@@ -227,15 +229,20 @@ export function create_user_effect(fn: () => void | (() => void)): Effect {
  * Internal representation of `$effect.pre(...)`
  */
 export function user_pre_effect(fn: () => void | (() => void)): Effect {
-	validate_effect('$effect.pre');
 	if (DEV) {
+		validate_effect('$effect.pre');
+
 		define_property(fn, 'name', {
 			value: '$effect.pre'
 		});
 	}
+
 	return create_effect(RENDER_EFFECT | USER_EFFECT, fn);
 }
 
+/**
+ * The effect of an `$inspect`, which runs as soon as what it reads is written. Only created in dev mode
+ */
 export function eager_effect(fn: () => void | (() => void)): Effect {
 	return create_effect(EAGER_EFFECT, fn);
 }
@@ -244,7 +251,6 @@ export function eager_effect(fn: () => void | (() => void)): Effect {
  * Internal representation of `$effect.root(...)`
  */
 export function effect_root(fn: () => void | (() => void)): () => void {
-	Batch.ensure();
 	const effect = create_effect(ROOT_EFFECT | EFFECT_PRESERVED, fn);
 
 	return () => {
@@ -253,78 +259,77 @@ export function effect_root(fn: () => void | (() => void)): () => void {
 }
 
 /**
- * An effect root whose children can transition out
+ * The root effect of a mounted component. Unlike `effect_root` it hands out the effect itself:
+ * `unmount` is what destroys it, after the outros if asked to, and an app that never unmounts
+ * does not need the code for that
  */
-export function component_root(fn: () => void): (options?: { outro?: boolean }) => Promise<void> {
-	Batch.ensure();
-	const effect = create_effect(ROOT_EFFECT | EFFECT_PRESERVED, fn);
-
-	return (options = {}) => {
-		return new Promise((fulfil) => {
-			if (options.outro) {
-				pause_effect(effect, () => {
-					destroy_effect(effect);
-					fulfil(undefined);
-				});
-			} else {
-				destroy_effect(effect);
-				fulfil(undefined);
-			}
-		});
-	};
+export function component_root(fn: () => void | (() => void)): Effect {
+	return create_effect(ROOT_EFFECT | EFFECT_PRESERVED, fn);
 }
 
 export function effect(fn: () => void | (() => void)): Effect {
+	has_effects = true;
+
 	return create_effect(EFFECT, fn);
-}
-
-/**
- * Internal representation of `$: ..`. Only a legacy mode component is compiled to a call of
- * this, so nothing is behind it. The name stays for as long as `internal/client/index`
- * re-exports it.
- */
-export function legacy_pre_effect(): never {
-	unsupported('legacy mode: components have to use runes');
-}
-
-/** See `legacy_pre_effect` */
-export function legacy_pre_effect_reset(): never {
-	unsupported('legacy mode: components have to use runes');
-}
-
-export function async_effect(fn: () => void | (() => void)): Effect {
-	return create_effect(ASYNC | EFFECT_PRESERVED, fn);
 }
 
 export function render_effect(fn: () => void | (() => void), flags = 0): Effect {
 	return create_effect(RENDER_EFFECT | flags, fn);
 }
 
+/**
+ * The effect of the expressions in a template. Each of `sync` gets a derived, so that the effect
+ * only runs when one of their values changes. The compiler passes the `await` expressions and
+ * what they wait for after that, which only have content with `experimental.async`
+ */
 export function template_effect(
 	fn: (...expressions: any) => void | (() => void),
-	sync: Array<() => any> = [],
-	async: Array<() => Promise<any>> = [],
-	blockers: Blocker[] = []
+	sync?: Array<() => any>
 ): void {
-	flatten(blockers, sync, async, (values) => {
-		create_effect(RENDER_EFFECT, () => {
-			fn(...values.map(get));
-		});
-	});
+	create_effect(RENDER_EFFECT, sync ? with_expressions(fn, sync) : fn);
 }
 
 /**
- * Like `template_effect`, but with an effect which is deferred until the batch commits
+ * Like `template_effect`, but with an effect that runs after the DOM has been updated
  */
 export function deferred_template_effect(
 	fn: (...expressions: any) => void | (() => void),
-	sync: Array<() => any> = [],
-	async: Array<() => Promise<any>> = [],
-	blockers: Blocker[] = []
+	sync?: Array<() => any>
 ): void {
-	flatten(blockers, sync, async, (values) => {
-		create_effect(EFFECT, () => fn(...values.map(get)));
-	});
+	has_effects = true;
+
+	create_effect(EFFECT, sync ? with_expressions(fn, sync) : fn);
+}
+
+function with_expressions(
+	fn: (...expressions: any) => void | (() => void),
+	sync: Array<() => any>
+): () => void | (() => void) {
+	var deriveds = expressions(sync);
+
+	return () => fn(...deriveds.map(get));
+}
+
+/**
+ * A derived for each of the expressions that the compiler hands to a template effect or
+ * an attribute effect
+ */
+export function expressions(sync: Array<() => any>): Derived[] {
+	var deriveds = sync.map(derived);
+
+	if (DEV) {
+		deriveds.forEach((d, i) => {
+			// TODO this is kinda useful for debugging but a lousy implementation —
+			// maybe the compiler could pass through the template string
+			d.label = sync[i]
+				.toString()
+				.replace('() => ', '')
+				.replaceAll('$.eager(() => ', '$state.eager(')
+				.replace(/\$\.get\((.+?)\)/g, (_, id) => id);
+		});
+	}
+
+	return deriveds;
 }
 
 export function block(fn: () => void, flags = 0): Effect {
@@ -351,8 +356,6 @@ export function execute_effect_teardown(effect: Effect): void {
 	var teardown = effect.teardown;
 	if (teardown !== null) {
 		const previously_destroying_effect = is_destroying_effect;
-		const previous_teardown_version = teardown_version;
-		const previous_teardown_context = teardown_context;
 		const previous_reaction = active_reaction;
 		set_is_destroying_effect(true);
 		set_active_reaction(null);
@@ -364,8 +367,7 @@ export function execute_effect_teardown(effect: Effect): void {
 			// themselves mid-teardown are skipped by invoke_error_boundary.
 			invoke_error_boundary(error, effect.parent);
 		} finally {
-			set_is_destroying_effect(previously_destroying_effect, previous_teardown_version);
-			set_teardown_context(previous_teardown_context);
+			set_is_destroying_effect(previously_destroying_effect);
 			set_active_reaction(previous_reaction);
 		}
 	}
@@ -376,8 +378,6 @@ export function destroy_effect_children(signal: Effect, remove_dom = false): voi
 	signal.first = signal.last = null;
 
 	while (effect !== null) {
-		abort_all(effect);
-
 		var next = effect.next;
 
 		if ((effect.f & ROOT_EFFECT) !== 0) {
@@ -406,6 +406,10 @@ export function destroy_block_effect_children(signal: Effect): void {
 export function destroy_effect(effect: Effect, remove_dom = true): void {
 	var removed = false;
 
+	if (has_abort_signals) {
+		abort_signal(effect);
+	}
+
 	if (
 		(remove_dom || (effect.f & HEAD_EFFECT) !== 0) &&
 		effect.nodes !== null &&
@@ -417,7 +421,7 @@ export function destroy_effect(effect: Effect, remove_dom = true): void {
 
 	effect.f |= DESTROYING;
 	destroy_effect_children(effect, remove_dom && !removed);
-	remove_reactions(effect);
+	remove_reactions(effect, 0);
 
 	var transitions = effect.nodes && effect.nodes.t;
 
@@ -450,12 +454,8 @@ export function destroy_effect(effect: Effect, remove_dom = true): void {
 		effect.teardown =
 		effect.ctx =
 		effect.deps =
-		effect.dv =
-		effect.edges =
 		effect.fn =
 		effect.nodes =
-		effect.ac =
-		effect.b =
 			null;
 }
 
@@ -507,25 +507,7 @@ export function pause_effect(effect: Effect, callback?: () => void, destroy = tr
 	var remaining = transitions.length;
 
 	if (remaining > 0) {
-		var context = teardown_context;
-
-		var check = () => {
-			if (!--remaining) {
-				var previous_context = teardown_context;
-
-				try {
-					if (context) {
-						// Other outros can share this context, and state may have changed
-						// since its derived values were cached.
-						context.derived_cache.clear();
-						set_teardown_context(context);
-					}
-					fn();
-				} finally {
-					if (context) set_teardown_context(previous_context);
-				}
-			}
-		};
+		var check = () => --remaining || fn();
 
 		for (var transition of transitions) {
 			transition.out(check);
@@ -595,8 +577,9 @@ function resume_children(effect: Effect, local: boolean): void {
 	// here because we don't want to eagerly recompute a derived like
 	// `{#if foo}{foo.bar()}{/if}` if `foo` is now `undefined`.
 	if ((effect.f & CLEAN) === 0) {
-		// Assumption: This happens during the commit phase of the batch, causing another flush, but it's safe
-		Batch.ensure().schedule(effect, MAYBE_DIRTY);
+		// (the traversal that passed over this effect while it was paused used up
+		// the marks that lead to it, so it is scheduled again)
+		schedule_effect(effect);
 	}
 
 	var child = effect.first;

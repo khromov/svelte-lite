@@ -42,7 +42,7 @@ if (DEV) {
 /**
  * Returns an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal) that aborts when the current [derived](https://svelte.dev/docs/svelte/$derived) or [effect](https://svelte.dev/docs/svelte/$effect) re-runs or is destroyed.
  *
- * Must be called while a derived or effect is running, before anything is awaited.
+ * Must be called while a derived or effect is running.
  *
  * ```svelte
  * <script>
@@ -50,15 +50,9 @@ if (DEV) {
  *
  * 	let { id } = $props();
  *
- * 	async function getData(id) {
- * 		const response = await fetch(`/items/${id}`, {
- * 			signal: getAbortSignal()
- * 		});
- *
- * 		return await response.json();
- * 	}
- *
- * 	const data = $derived(await getData(id));
+ * 	$effect(() => {
+ * 		fetch(`/items/${id}`, { signal: getAbortSignal() }).then(show);
+ * 	});
  * </script>
  * ```
  */
@@ -198,11 +192,7 @@ export function afterUpdate(fn: () => void): void {
 	e.lifecycle_legacy_only('afterUpdate');
 }
 
-// `fork` is part of `experimental.async`, which svelte-lite leaves out, and is meant to fail
-// through `unsupported()`. It is still the scheduler's own: one test of the signals suite that
-// is in scope turns the async flag on by hand and forks a batch ("prunes the edges of a block
-// effect that only a discarded batch needed"). In an app nothing can turn that flag on, and
-// `fork` fails the way it does in Svelte without `experimental.async`.
+// `fork` is part of `experimental.async`, which svelte-lite leaves out. It fails when called
 export { flushSync, fork } from './internal/client/reactivity/batch.ts';
 export {
 	createContext,
