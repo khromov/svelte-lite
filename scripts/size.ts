@@ -20,9 +20,8 @@ import { rollup, type Plugin } from 'rollup';
 import { minify } from 'terser';
 import { RESULTS, ROOT, UPSTREAM_PKG, get_impl } from '../harness/paths.ts';
 import { create_resolver } from '../harness/resolve.ts';
-// @ts-expect-error plain data modules, taken over from the size study of Svelte
+// plain data modules, taken over from the size study of Svelte
 import features from './size/features.mjs';
-// @ts-expect-error
 import realistic from './size/realistic.mjs';
 
 interface Scenario {

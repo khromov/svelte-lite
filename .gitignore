@@ -3,3 +3,6 @@ node_modules/
 
 # results of the last full run of each implementation
 .results/
+
+# worktrees of agents working on this repo
+.claude/worktrees/
