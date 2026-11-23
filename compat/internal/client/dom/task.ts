@@ -1,0 +1,2 @@
+// Stands in for upstream src/internal/client/dom/task.js
+export {};

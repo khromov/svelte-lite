@@ -1,0 +1,5 @@
+[submodule "vendor/svelte"]
+	path = vendor/svelte
+	url = https://github.com/sveltejs/svelte.git
+	branch = main
+	shallow = true

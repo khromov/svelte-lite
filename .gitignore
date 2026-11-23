@@ -1,0 +1,5 @@
+node_modules/
+.DS_Store
+
+# results of the last full run of each implementation
+.results/

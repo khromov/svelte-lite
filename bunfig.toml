@@ -1,0 +1,4 @@
+[test]
+# `bun test` runs only the harness's own unit tests. The upstream Svelte suite
+# under vendor/ is vitest-based and runs through `bun run test`.
+root = "harness"
