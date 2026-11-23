@@ -16,6 +16,7 @@ import { TRANSITION_GLOBAL, TRANSITION_IN, TRANSITION_OUT } from '../../../../co
 import { BLOCK_EFFECT, REACTION_RAN, EFFECT_TRANSPARENT } from '../../constants.ts';
 import { queue_micro_task } from '../task.ts';
 import { without_reactive_context } from './bindings/shared.ts';
+import { set_has_animations } from '../blocks/each.ts';
 
 /** What a transition function returns: the config, or a function that gives it once the DOM is updated */
 type AnimationOptions = AnimationConfig | ((opts: { direction: 'in' | 'out' }) => AnimationConfig);
@@ -81,7 +82,7 @@ export function animation<P>(
 	get_fn: () => AnimateFn<P | undefined>,
 	get_params: (() => P) | null
 ): void {
-	set_has_transitions();
+	set_has_animations();
 
 	var effect = animation_effect_override ?? (active_effect as Effect);
 	var nodes = effect.nodes as EffectNodes;

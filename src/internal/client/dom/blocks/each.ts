@@ -73,6 +73,19 @@ function destroy_effects(to_destroy: Effect[], remove_dom = true) {
 var offscreen_anchor: Text | undefined;
 
 /**
+ * Whether an element with an `animate:` directive has been created. Nothing but `animation` sets
+ * this, before it gives an item its animation, so that a bundler can tell that an app without the
+ * directive never has an item to animate, whatever the flags of its each blocks. Until it is set,
+ * `nodes.a` is `null` on every effect. (It is not `has_transitions`: an app with one of the two
+ * does not pay for the other)
+ */
+export let has_animations = false;
+
+export function set_has_animations(): void {
+	has_animations = true;
+}
+
+/**
  * @param node The next sibling node, or the parent node if this is a 'controlled' block
  * @param fallback_fn Renders the `{:else}`. It has no default value on purpose: a bundler works out
  * that no each block of an app passes it only for a parameter without one, and then leaves out
@@ -211,8 +224,7 @@ export function each<V>(
 	 * item that is not where the walk has got to in front of what is there
 	 */
 	function reconcile(array: V[]): void {
-		// (an item has nothing to animate until `animation` has given one to an element)
-		var is_animated = has_transitions && (flags & EACH_IS_ANIMATED) !== 0;
+		var is_animated = has_animations && (flags & EACH_IS_ANIMATED) !== 0;
 
 		var length = array.length;
 		var current = skip_to_branch(each_effect.first);
