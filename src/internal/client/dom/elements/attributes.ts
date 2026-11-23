@@ -1,7 +1,7 @@
 import { DEV } from 'esm-env';
 import type { Effect } from '../../types.ts';
 import { ATTACHMENT_KEY, NAMESPACE_HTML, UNINITIALIZED } from '../../../../constants.ts';
-import { can_delegate_event, is_capture_event, normalize_attribute } from '../../../../utils.ts';
+import { is_capture_event, normalize_attribute } from '../../../../utils.ts';
 import { clsx } from '../../../shared/attributes.ts';
 import { get_descriptors, get_prototype_of } from '../../../shared/utils.ts';
 import {
@@ -36,7 +36,7 @@ import {
 	set_selected
 } from './bindings/select.ts';
 import { set_class } from './class.ts';
-import { create_event, delegate, delegated } from './events.ts';
+import { create_event } from './events.ts';
 import { add_form_reset_listener, autofocus } from './misc.ts';
 import { set_style } from './style.ts';
 
@@ -367,14 +367,13 @@ function set_attributes(
 				const opts: { capture?: true } = {};
 				const event_handle_key = '$$' + key;
 				let event_name = key.slice(2);
-				var is_delegated = can_delegate_event(event_name);
 
 				if (is_capture_event(event_name)) {
 					event_name = event_name.slice(0, -7);
 					opts.capture = true;
 				}
 
-				if (!is_delegated && prev_value) {
+				if (prev_value) {
 					// Listening to same event but different handler -> our handle function below takes care of this
 					// If we were to remove and add listeners in this case, it could happen that the event is "swallowed"
 					// (the browser seems to not know yet that a new one exists now) and doesn't reach the handler
@@ -385,10 +384,7 @@ function set_attributes(
 					current[event_handle_key] = null;
 				}
 
-				if (is_delegated) {
-					delegated(event_name, element, value);
-					delegate([event_name]);
-				} else if (value != null) {
+				if (value != null) {
 					function handle(this: any, ...args: any[]) {
 						current[key].apply(this, args);
 					}

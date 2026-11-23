@@ -101,40 +101,6 @@ export function is_capture_event(name: string) {
 	return name.endsWith('capture') && name !== 'gotpointercapture' && name !== 'lostpointercapture';
 }
 
-/** List of Element events that will be delegated */
-const DELEGATED_EVENTS = [
-	'beforeinput',
-	'click',
-	'change',
-	'dblclick',
-	'contextmenu',
-	'focusin',
-	'focusout',
-	'input',
-	'keydown',
-	'keyup',
-	'mousedown',
-	'mousemove',
-	'mouseout',
-	'mouseover',
-	'mouseup',
-	'pointerdown',
-	'pointermove',
-	'pointerout',
-	'pointerover',
-	'pointerup',
-	'touchend',
-	'touchmove',
-	'touchstart'
-];
-
-/**
- * Returns `true` if `event_name` is a delegated event
- */
-export function can_delegate_event(event_name: string) {
-	return DELEGATED_EVENTS.includes(event_name);
-}
-
 /**
  * Attributes that are boolean, i.e. they are present or not present.
  */
@@ -232,24 +198,6 @@ const NON_STATIC_PROPERTIES = ['autofocus', 'muted', 'defaultValue', 'defaultChe
  */
 export function cannot_be_set_statically(name: string) {
 	return NON_STATIC_PROPERTIES.includes(name);
-}
-
-/**
- * Subset of delegated events which should be passive by default.
- * These two are already passive via browser defaults on window, document and body.
- * But since
- * - we're delegating them
- * - they happen often
- * - they apply to mobile which is generally less performant
- * we're marking them as passive by default for other elements, too.
- */
-const PASSIVE_EVENTS = ['touchstart', 'touchmove'];
-
-/**
- * Returns `true` if `name` is a passive event
- */
-export function is_passive_event(name: string) {
-	return PASSIVE_EVENTS.includes(name);
 }
 
 const CONTENT_EDITABLE_BINDINGS = ['textContent', 'innerHTML', 'innerText'];

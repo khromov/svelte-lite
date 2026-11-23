@@ -4,7 +4,6 @@ import { DEV } from 'esm-env';
 import { HYDRATION_END, HYDRATION_ERROR, HYDRATION_START } from '../../constants.ts';
 import { COMMENT_NODE, EFFECT_TRANSPARENT, TEXT_CACHE } from './constants.ts';
 import { component_context, mark_as_component, pop, push } from './context.ts';
-import { listen_to_delegated_events } from './dom/elements/events.ts';
 import {
 	hydrate_next,
 	hydrate_node,
@@ -193,12 +192,7 @@ function _mount<Exports extends Record<string, any>>(
 		// the transitions of the elements at the top of the component play when it is unmounted
 		effect.f |= EFFECT_TRANSPARENT;
 
-		// Setup event delegation _after_ component is mounted - if an error would happen during mount, it would otherwise not be cleaned up
-		var stop_listening = listen_to_delegated_events(target);
-
 		return () => {
-			stop_listening();
-
 			if (anchor_node !== anchor) {
 				anchor_node.parentNode?.removeChild(anchor_node);
 			}
