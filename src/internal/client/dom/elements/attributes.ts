@@ -1,7 +1,6 @@
 import { DEV } from 'esm-env';
 import { NAMESPACE_HTML, UNINITIALIZED } from '../../../../constants.ts';
 import { is_capture_event, normalize_attribute } from '../../../../utils.ts';
-import { clsx } from '../../../shared/attributes.ts';
 import { get_descriptors, get_prototype_of } from '../../../shared/utils.ts';
 import {
 	ATTRIBUTES_CACHE,
@@ -21,17 +20,18 @@ import * as w from '../../warnings.ts';
 import { hydrating, set_hydrating } from '../hydration.ts';
 import { set_attribute as set_attribute_op } from '../operations.ts';
 import { queue_micro_task } from '../task.ts';
-import { set_class } from './class.ts';
 import { create_event } from './events.ts';
 import { add_form_reset_listener, autofocus } from './misc.ts';
 import { set_style } from './style.ts';
 
 /**
- * What a spread is given: attributes by name, plus `CLASS` and `STYLE` by symbol. Attachments,
- * which are under symbols too (`createAttachmentKey()`), are not applied
+ * What a spread is given: attributes by name, plus `CLASS` and `STYLE` by symbol. Of those,
+ * `STYLE` is applied. `CLASS` and attachments, which are under symbols too
+ * (`createAttachmentKey()`), are not
  */
 type Attributes = Record<string | symbol, any>;
 
+/** The key the compiler puts the `class:` directives of an element with a spread under */
 export const CLASS = Symbol('class');
 export const STYLE = Symbol('style');
 
@@ -277,10 +277,10 @@ function set_attributes(
 			}
 		}
 
-		if (next.class) {
-			next.class = clsx(next.class);
-		} else if (css_hash || next[CLASS]) {
-			next.class = null; /* force call to set_class() */
+		if (css_hash) {
+			// `class` is a string like any other attribute here, with the hash that scopes the
+			// component's styles added to it. Objects, arrays and `class:` directives are not applied
+			next.class = next.class ? next.class + ' ' + css_hash : css_hash;
 		}
 
 		if (next[STYLE]) {
@@ -302,14 +302,6 @@ function set_attributes(
 		for (const key in next) {
 			// let instead of var because referenced in a closure
 			let value = next[key];
-
-			if (key === 'class') {
-				var is_html = element.namespaceURI === NAMESPACE_HTML;
-				set_class(element, is_html, value, css_hash, prev?.[CLASS], next[CLASS]);
-				current[key] = value;
-				current[CLASS] = next[CLASS];
-				continue;
-			}
 
 			if (key === 'style') {
 				set_style(element, value, prev?.[STYLE], next[STYLE]);
