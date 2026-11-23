@@ -6,3 +6,6 @@ node_modules/
 
 # worktrees of agents working on this repo
 .claude/worktrees/
+
+# throwaway apps for trying svelte-lite out
+playground/
