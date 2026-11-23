@@ -73,6 +73,9 @@ var offscreen_anchor: Text | undefined;
 
 /**
  * @param node The next sibling node, or the parent node if this is a 'controlled' block
+ * @param fallback_fn Renders the `{:else}`. It has no default value on purpose: a bundler works out
+ * that no each block of an app passes it only for a parameter without one, and then leaves out
+ * what is behind a test that starts with `fallback_fn`
  */
 export function each<V>(
 	node: Element | Comment,
@@ -85,7 +88,7 @@ export function each<V>(
 		index: MaybeSource<number>,
 		collection: () => V[]
 	) => void,
-	fallback_fn: null | ((anchor: Node) => void) = null
+	fallback_fn?: (anchor: Node) => void
 ): void {
 	var anchor: TemplateNode = node;
 
@@ -403,7 +406,7 @@ export function each<V>(
 			keys.add(key);
 		}
 
-		if (length === 0 && fallback_fn && !fallback) {
+		if (fallback_fn && length === 0 && !fallback) {
 			if (first_run) {
 				fallback = branch(() => fallback_fn(anchor));
 			} else {
@@ -434,7 +437,7 @@ export function each<V>(
 
 			reconcile(array);
 
-			if (fallback !== null) {
+			if (fallback_fn && fallback !== null) {
 				if (array.length === 0) {
 					if ((fallback.f & EFFECT_OFFSCREEN) === 0) {
 						resume_effect(fallback);
