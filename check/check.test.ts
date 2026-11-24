@@ -45,6 +45,14 @@ const cases: Record<string, { found: string[]; fine: string[] }> = {
 			`<script>import Child from './Child.svelte';</script><Child {...{ ondone() {} }} />`
 		]
 	},
+	slot_element: {
+		found: [`<div><slot /></div>`, `<slot name="header">fallback</slot>`, `<slot item={1} />`],
+		fine: [
+			`<script>let { children } = $props();</script>{@render children?.()}`,
+			`<svelte:options customElement="my-element" /><slot />`,
+			`<div slot="x"></div>`
+		]
+	},
 	window_event_directive: {
 		found: [
 			`<svelte:window on:keydown={() => {}} />`,
@@ -149,6 +157,11 @@ describe('check', () => {
 		expect(finding.instead).toBe(
 			'use the `onsubmitcapture` attribute, and call `event.preventDefault()` in the handler'
 		);
+	});
+
+	test('takes `<slot>` in a custom element, also one that the compiler option makes one', () => {
+		expect(rules(`<slot />`)).toEqual(['slot_element']);
+		expect(rules(`<slot />`, { customElement: true })).toEqual([]);
 	});
 
 	test('reports where it found something, as Svelte does', () => {

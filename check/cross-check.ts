@@ -144,8 +144,8 @@ for (const file of files) {
 		} else if (failed) {
 			// the compiler stops at its first error, which need not be the first in the file
 			after_error.set(finding.rule, (after_error.get(finding.rule) ?? 0) + 1);
-		} else if (legacy_mode && finding.kind === 'legacy') {
-			// what only legacy mode has is fine there, and `runes={false}` is the finding
+		} else if (legacy_mode && (finding.kind === 'legacy' || finding.kind === 'deprecated')) {
+			// in legacy mode the compiler accepts what only it has, and warns about no deprecated syntax
 			push(in_legacy_mode, finding.rule, `${relative}:${finding.line}:${finding.column}`);
 		} else if (SILENT[finding.rule] && (SILENT[finding.rule].when?.(finding) ?? true)) {
 			push(silent, finding.rule, `${relative}:${finding.line}:${finding.column}`);
@@ -182,7 +182,7 @@ for (const [rule, entries] of [...silent].sort()) {
 	console.log(`  ${String(entries.length).padStart(5)}  ${rule}: ${SILENT[rule].why}${list(entries)}`);
 }
 
-console.log('\nFindings of legacy syntax in a component that selects legacy mode (matched by `runes={false}`):');
+console.log('\nFindings in a component that selects legacy mode, where the compiler takes legacy syntax and warns about nothing deprecated (`runes={false}` is matched):');
 for (const [rule, entries] of [...in_legacy_mode].sort()) console.log(`  ${String(entries.length).padStart(5)}  ${rule}${list(entries)}`);
 
 console.log('\nFindings in a component on which the compiler failed elsewhere first, which it did not get to:');

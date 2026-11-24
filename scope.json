@@ -14,7 +14,8 @@
 		"svelte-legacy": "`svelte/legacy`, deprecated as a whole: `mount` and `hydrate` take the place of `createClassComponent` and `asClassComponent`, `$effect.pre` that of `run`, plain functions that of `handlers` and the event modifier functions, callback props that of `createBubbler`",
 		"component-api-4": "The deprecated `compatibility.componentApi: 4` compiler option, which makes components classes through `svelte/legacy`: `mount` takes its place",
 		"on-directive": "`on:` directives on elements, deprecated: event attributes (`onclick`) take their place. svelte-lite rejects them when compiling",
-		"event-forwarding": "Event forwarding (`on:click` without a handler), deprecated: a callback prop that the component passes on takes its place. svelte-lite rejects it when compiling"
+		"event-forwarding": "Event forwarding (`on:click` without a handler), deprecated: a callback prop that the component passes on takes its place. svelte-lite rejects it when compiling",
+		"slot-element": "`<slot>` outside a custom element, deprecated: `{@render ...}` of a snippet prop takes its place. svelte-lite rejects it when compiling"
 	},
 	"suites": {
 		"runtime-legacy": "legacy",
@@ -46,6 +47,7 @@
 			"siblings-combinator-nested-slots": "legacy",
 			"siblings-combinator-nested-slots-flattened": "legacy",
 			"siblings-combinator-selects-slot-fallback": "legacy",
+			"siblings-combinator-slot-named-between-default": "slot-element",
 			"siblings-combinator-slots-between": "legacy",
 			"spread": "legacy",
 			"unused-selector-string-concat": "legacy",
@@ -57,6 +59,7 @@
 		"hydration": {
 			"binding-input": "legacy",
 			"boundary-pending-attribute": "async",
+			"claim-text": "slot-element",
 			"dynamic-element-child-mismatch": "legacy",
 			"dynamic-text": "legacy",
 			"dynamic-text-changed": "legacy",
@@ -71,10 +74,12 @@
 			"if-block": "legacy",
 			"if-block-anchor": "legacy",
 			"if-block-false": "legacy",
+			"if-block-mismatch-2": "slot-element",
 			"if-block-update": "legacy",
 			"noscript": "legacy",
 			"raw": "legacy",
-			"raw-repair": "legacy"
+			"raw-repair": "legacy",
+			"text-fallback": "slot-element"
 		},
 		"motion": {
 			"motion > spring > handles initially undefined values": "motion-stores",
@@ -272,6 +277,8 @@
 			"readonly-state": "on-directive",
 			"readonly-state-replace": "on-directive",
 			"runes-in-module-context": "on-directive",
+			"slot": "slot-element",
+			"slot-static": "slot-element",
 			"snippet-argument": "on-directive",
 			"snippet-argument-destructured": "on-directive",
 			"snippet-argument-destructured-multiple": "on-directive",
@@ -285,6 +292,8 @@
 			"snippet-prop-implicit": "on-directive",
 			"snippet-prop-reactive": "on-directive",
 			"snippet-reactive": "on-directive",
+			"snippet-spread": "slot-element",
+			"snippets-as-slots": "slot-element",
 			"state-snapshot": "on-directive",
 			"state-space": "on-directive",
 			"state-store-props": "on-directive",

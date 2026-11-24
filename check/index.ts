@@ -103,6 +103,12 @@ const MODIFIERS: Record<string, string> = {
 	nonpassive: 'add the listener with `on(element, type, handler, { passive: false })` of `svelte/events`'
 };
 
+/** The value of an attribute that is plain text, as in `name="header"` */
+const text = (attribute: Node | undefined): string | undefined =>
+	Array.isArray(attribute?.value) && attribute.value.length === 1 && attribute.value[0].type === 'Text'
+		? attribute.value[0].data
+		: undefined;
+
 /** What to write in place of an `on:` directive with a handler, on an element */
 function event_attribute(node: Node) {
 	const capture = node.modifiers.includes('capture') ? 'capture' : '';
@@ -156,6 +162,26 @@ export const RULES: Rule[] = [
 		instead: (node) =>
 			`pass a callback prop, \`on${node.name}={...}\`, and have the component call it` +
 			(node.modifiers.includes('once') ? ' (once: it can remember that it did)' : '')
+	},
+	{
+		code: 'slot_element',
+		kind: 'deprecated',
+		node: 'SlotElement',
+		// a custom element renders its light DOM children through it, which is not deprecated
+		when: (_, context) => !context.custom_element,
+		found: (node) => {
+			const name = text(node.attributes.find((a: Node) => a.type === 'Attribute' && a.name === 'name'));
+			return `\`<slot${name ? ` name="${name}"` : ''}>\`, which renders what the parent passes`;
+		},
+		instead: (node) => {
+			const name = text(node.attributes.find((a: Node) => a.type === 'Attribute' && a.name === 'name'));
+			const props = node.attributes.filter((a: Node) => a.type !== 'Attribute' || a.name !== 'name');
+			const prop = name ?? 'children';
+			return (
+				`render a snippet prop: \`{@render ${prop}?.(${props.length > 0 ? '...' : ''})}\`` +
+				(props.length > 0 ? `, with what the slot passes as arguments` : '')
+			);
+		}
 	},
 	{
 		code: 'window_event_directive',
