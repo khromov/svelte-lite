@@ -297,23 +297,6 @@ export interface Snippet<Parameters extends unknown[] = []> {
 	} & typeof SnippetReturn;
 }
 
-interface DispatchOptions {
-	cancelable?: boolean;
-}
-
-export interface EventDispatcher<EventMap extends Record<string, any>> {
-	// Implementation notes:
-	// - undefined extends X instead of X extends undefined makes this work better with both strict and nonstrict mode
-	// - | null | undefined is added for convenience, as they are equivalent for the custom event constructor (both result in a null detail)
-	<Type extends keyof EventMap>(
-		...args: null extends EventMap[Type]
-			? [type: Type, parameter?: EventMap[Type] | null | undefined, options?: DispatchOptions]
-			: undefined extends EventMap[Type]
-				? [type: Type, parameter?: EventMap[Type] | null | undefined, options?: DispatchOptions]
-				: [type: Type, parameter: EventMap[Type], options?: DispatchOptions]
-	): boolean;
-}
-
 /**
  * Defines the options accepted by the `mount()` function.
  */

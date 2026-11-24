@@ -129,8 +129,9 @@ export function getAllContexts<T extends Map<any, any> = Map<any, any>>(): T {
 }
 
 /**
- * `runes` told legacy components apart, which svelte-lite leaves out. It is in the signature
- * because the compiler passes `fn` after it by position.
+ * The compiler passes the component's props, `runes` and, in dev, the component function, by
+ * position. Only the last is used: the props were for `createEventDispatcher` and `runes` told
+ * legacy components apart, both of which svelte-lite leaves out.
  */
 export function push(props: Record<string, unknown>, runes?: unknown, fn?: Function): void {
 	component_context = {
@@ -138,8 +139,6 @@ export function push(props: Record<string, unknown>, runes?: unknown, fn?: Funct
 		i: false,
 		c: null,
 		e: null,
-		s: props,
-		x: null,
 		r: active_effect as Effect
 	};
 
@@ -161,10 +160,6 @@ export function pop<T extends Record<string, any>>(component?: T): T {
 		for (var fn of effects) {
 			create_user_effect(fn);
 		}
-	}
-
-	if (component !== undefined) {
-		context.x = component;
 	}
 
 	context.i = true;

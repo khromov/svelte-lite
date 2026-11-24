@@ -6,7 +6,6 @@ export {
 	onMount,
 	flushSync,
 	untrack,
-	createEventDispatcher,
 	mount,
 	hydrate,
 	unmount,

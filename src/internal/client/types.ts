@@ -28,16 +28,6 @@ export type ComponentContext = {
 	/** True if initialized, i.e. pop() ran */
 	i: boolean;
 	/**
-	 * props — needed for legacy mode lifecycle functions, and for `createEventDispatcher`
-	 * @deprecated remove in 6.0
-	 */
-	s: Record<string, unknown>;
-	/**
-	 * exports (and props, if `accessors: true`) — needed for `createEventDispatcher`
-	 * @deprecated remove in 6.0
-	 */
-	x: Record<string, any> | null;
-	/**
 	 * The parent effect of this component
 	 * TODO 6.0 this is used to control `bind:this` timing that might change,
 	 * in which case we can remove this property

@@ -23,6 +23,11 @@ export const REMOVED_EXPORTS: RemovedExports[] = [
 		names: ['beforeUpdate', 'afterUpdate']
 	},
 	{
+		feature: '`createEventDispatcher`',
+		module: 'svelte',
+		names: ['createEventDispatcher', 'EventDispatcher']
+	},
+	{
 		feature: 'the `spring` and `tweened` stores',
 		module: 'svelte/motion',
 		names: ['spring', 'tweened', 'Tweened', 'Updater']

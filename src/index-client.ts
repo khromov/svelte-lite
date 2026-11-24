@@ -1,9 +1,7 @@
-import type { EventDispatcher } from './index.ts';
 import type { NotFunction } from './internal/types.ts';
 // in the order of Svelte's module: the runtime's modules import each other in cycles,
 // and this is often the first one an app loads, so it decides in which order they run
 import { active_reaction, get_abort_signal, untrack } from './internal/client/runtime.ts';
-import { is_array } from './internal/shared/utils.ts';
 import { user_effect } from './internal/client/reactivity/effects.ts';
 import * as e from './internal/client/errors.ts';
 import { component_context } from './internal/client/context.ts';
@@ -99,63 +97,6 @@ export function onDestroy(fn: () => any): void {
 	}
 
 	onMount(() => () => untrack(fn));
-}
-
-function create_custom_event<T = any>(
-	type: string,
-	detail?: T,
-	{ bubbles = false, cancelable = false }: { bubbles?: boolean; cancelable?: boolean } = {}
-): CustomEvent<T> {
-	return new CustomEvent(type, { detail, bubbles, cancelable });
-}
-
-/**
- * Creates an event dispatcher that can be used to dispatch [component events](https://svelte.dev/docs/svelte/legacy-on#Component-events).
- * Event dispatchers are functions that can take two arguments: `name` and `detail`.
- *
- * Component events created with `createEventDispatcher` create a
- * [CustomEvent](https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent).
- * These events do not [bubble](https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Building_blocks/Events#Event_bubbling_and_capture).
- * The `detail` argument corresponds to the [CustomEvent.detail](https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent/detail)
- * property and can contain any type of data.
- *
- * The event dispatcher can be typed to narrow the allowed event names and the type of the `detail` argument:
- * ```ts
- * const dispatch = createEventDispatcher<{
- *  loaded: null; // does not take a detail argument
- *  change: string; // takes a detail argument of type string, which is required
- *  optional: number | null; // takes an optional detail argument of type number
- * }>();
- * ```
- *
- * @deprecated Use callback props and/or the `$host()` rune instead — see [migration guide](https://svelte.dev/docs/svelte/v5-migration-guide#Event-changes-Component-events)
- */
-export function createEventDispatcher<
-	EventMap extends Record<string, any> = any
->(): EventDispatcher<EventMap> {
-	const active_component_context = component_context;
-	if (active_component_context === null) {
-		e.lifecycle_outside_component('createEventDispatcher');
-	}
-
-	return ((type: string, detail?: unknown, options?: { cancelable?: boolean }) => {
-		const events = (
-			active_component_context.s.$$events as Record<string, Function | Function[]> | undefined
-		)?.[type];
-
-		if (events) {
-			const callbacks = is_array(events) ? events.slice() : [events];
-			// TODO are there situations where events could be dispatched
-			// in a server (non-DOM) environment?
-			const event = create_custom_event(type, detail, options);
-			for (const fn of callbacks) {
-				fn.call(active_component_context.x, event);
-			}
-			return !event.defaultPrevented;
-		}
-
-		return true;
-	}) as EventDispatcher<EventMap>;
 }
 
 // `fork` is part of `experimental.async`, which svelte-lite leaves out. It fails when called

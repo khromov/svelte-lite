@@ -177,8 +177,8 @@ if (typeof HTMLElement === 'function') {
 		}
 
 		/**
-		 * Adds a handler of the component's own events (those of `createEventDispatcher` and
-		 * forwarded ones), and returns the function that removes it
+		 * Adds a handler of the events that the component forwards (`<button on:click>`), and
+		 * returns the function that removes it
 		 */
 		$$on(type: string, listener: EventListenerOrEventListenerObject) {
 			const handler = (...args: any[]) => (listener as Function).call(this, ...args);
