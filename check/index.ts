@@ -226,6 +226,17 @@ export const RULES: Rule[] = [
 				: 'hold the component in a capitalised variable, `let Thing = $derived(...)`, and use it as a tag, `<Thing />`'
 	},
 	{
+		code: 'svelte_self',
+		kind: 'deprecated',
+		node: 'SvelteSelf',
+		found: () => '`<svelte:self>`, which renders the component itself',
+		instead: (_, context) => {
+			const basename = context.filename?.split(/[/\\]/).pop() ?? 'Self.svelte';
+			const name = basename.replace(/\.svelte$/, '').replace(/[^\w$]/g, '_').replace(/^./, (c) => c.toUpperCase());
+			return `import the component into itself, \`import ${name} from './${basename}'\`, and use \`<${name} />\``;
+		}
+	},
+	{
 		code: 'window_event_directive',
 		kind: 'deprecated',
 		node: 'OnDirective',

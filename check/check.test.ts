@@ -88,6 +88,12 @@ const cases: Record<string, { found: string[]; fine: string[] }> = {
 			`<script>let { items } = $props();</script>{#each items as item}<item.component />{/each}`
 		]
 	},
+	svelte_self: {
+		found: [`<script>let { depth } = $props();</script>{#if depth > 0}<svelte:self depth={depth - 1} />{/if}`],
+		fine: [
+			`<script>import Tree from './Tree.svelte'; let { depth } = $props();</script>{#if depth > 0}<Tree depth={depth - 1} />{/if}`
+		]
+	},
 	window_event_directive: {
 		found: [
 			`<svelte:window on:keydown={() => {}} />`,
@@ -191,6 +197,14 @@ describe('check', () => {
 		expect(finding.found).toBe('`on:submit|capture|preventDefault`, an `on:` directive');
 		expect(finding.instead).toBe(
 			'use the `onsubmitcapture` attribute, and call `event.preventDefault()` in the handler'
+		);
+	});
+
+	test('says how to import a component into itself, by its file name', () => {
+		const source = `{#if true}<svelte:self />{/if}`;
+
+		expect(check(source, { filename: 'src/lib/tree-view.svelte' })[0].instead).toBe(
+			"import the component into itself, `import Tree_view from './tree-view.svelte'`, and use `<Tree_view />`"
 		);
 	});
 
