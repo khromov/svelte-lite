@@ -140,11 +140,7 @@ export function push(props: Record<string, unknown>, runes?: unknown, fn?: Funct
 		e: null,
 		s: props,
 		x: null,
-		r: active_effect as Effect,
-		// Legacy mode, which svelte-lite leaves out, so this is always `null`. It stays for the
-		// borrowed `index-client`: that is how its `beforeUpdate` and `afterUpdate` tell that
-		// they are in a runes component
-		l: null
+		r: active_effect as Effect
 	};
 
 	if (DEV) {

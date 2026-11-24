@@ -44,32 +44,9 @@ export type ComponentContext = {
 	 */
 	r: Effect;
 	/**
-	 * legacy stuff
-	 * @deprecated remove in 6.0
-	 */
-	l: null | {
-		/** local signals (needed for beforeUpdate/afterUpdate) */
-		s: null | Source[];
-		/** update_callbacks */
-		u: null | {
-			/** afterUpdate callbacks */
-			a: Array<() => void>;
-			/** beforeUpdate callbacks */
-			b: Array<() => void>;
-			/** onMount callbacks */
-			m: Array<() => any>;
-		};
-		/** `$:` statements */
-		$: any[];
-	};
-	/**
 	 * dev mode only: the component function
 	 */
 	function?: any;
-};
-
-export type ComponentContextLegacy = ComponentContext & {
-	l: NonNullable<ComponentContext['l']>;
 };
 
 export type Equals = (this: Pick<Value, 'v'>, value: unknown) => boolean;

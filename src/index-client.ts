@@ -90,8 +90,8 @@ export function onMount<T>(
 /**
  * Schedules a callback to run immediately before the component is unmounted.
  *
- * Out of `onMount`, `beforeUpdate`, `afterUpdate` and `onDestroy`, this is the
- * only one that runs inside a server-side component.
+ * Out of `onMount` and `onDestroy`, this is the only one that runs inside a server-side
+ * component.
  */
 export function onDestroy(fn: () => any): void {
 	if (component_context === null) {
@@ -156,40 +156,6 @@ export function createEventDispatcher<
 
 		return true;
 	}) as EventDispatcher<EventMap>;
-}
-
-// TODO mark beforeUpdate and afterUpdate as deprecated in Svelte 6
-
-/**
- * Schedules a callback to run immediately before the component is updated after any state change.
- *
- * Only a legacy mode component can use this. Every component of svelte-lite is a runes component,
- * where it fails the way it does in Svelte: use `$effect.pre` instead.
- *
- * @deprecated Use [`$effect.pre`](https://svelte.dev/docs/svelte/$effect#$effect.pre) instead
- */
-export function beforeUpdate(fn: () => void): void {
-	if (component_context === null) {
-		e.lifecycle_outside_component('beforeUpdate');
-	}
-
-	e.lifecycle_legacy_only('beforeUpdate');
-}
-
-/**
- * Schedules a callback to run immediately after the component has been updated.
- *
- * Only a legacy mode component can use this. Every component of svelte-lite is a runes component,
- * where it fails the way it does in Svelte: use `$effect` instead.
- *
- * @deprecated Use [`$effect`](https://svelte.dev/docs/svelte/$effect) instead
- */
-export function afterUpdate(fn: () => void): void {
-	if (component_context === null) {
-		e.lifecycle_outside_component('afterUpdate');
-	}
-
-	e.lifecycle_legacy_only('afterUpdate');
 }
 
 // `fork` is part of `experimental.async`, which svelte-lite leaves out. It fails when called
