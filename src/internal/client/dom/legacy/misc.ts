@@ -19,32 +19,3 @@ export function bubble_event(this: any, $$props: Record<string, unknown>, event:
 		fn.call(this, event);
 	}
 }
-
-/**
- * Used to simulate `$on` on a component instance when `compatibility.componentApi === 4`
- */
-export function add_legacy_event_listener(
-	$$props: Record<string, any>,
-	event_name: string,
-	event_callback: Function
-): void {
-	$$props.$$events ||= {};
-	$$props.$$events[event_name] ||= [];
-	$$props.$$events[event_name].push(event_callback);
-}
-
-/**
- * Used to simulate `$set` on a component instance when `compatibility.componentApi === 4`.
- * Needs component accessors so that it can call the setter of the prop. Therefore doesn't
- * work for updating props in `$$props` or `$$restProps`.
- */
-export function update_legacy_props(
-	this: Record<string, any>,
-	$$new_props: Record<string, any>
-): void {
-	for (var key in $$new_props) {
-		if (key in this) {
-			this[key] = $$new_props[key];
-		}
-	}
-}

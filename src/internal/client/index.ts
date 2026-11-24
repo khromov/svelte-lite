@@ -12,6 +12,8 @@
 //   `wait`, `for_await_track_reactivity_loss`
 // - custom renderers: `renderer_snippet`, `validate_snippet_renderer`, `push_renderer`,
 //   `pop_renderer`, `cross`, `is_crossing`
+// - the deprecated `compatibility.componentApi: 4` option: `add_legacy_event_listener`,
+//   `update_legacy_props` (it also imports `createClassComponent` from `svelte/legacy`)
 //
 // A component that needs one of these fails where it is compiled, see `src/compiler/index.ts`.
 //
@@ -23,8 +25,7 @@
 //   `experimental.async`
 // - the event modifiers, `bubble_event`, `slot` and `sanitize_slots` are `on:` and `<slot>`,
 //   which are deprecated and still valid in a runes component
-// - `add_legacy_event_listener` and `update_legacy_props` are the `compatibility.componentApi: 4`
-//   option, `check_target` and `legacy_api` the errors for using a component as a class without it
+// - `check_target` and `legacy_api` are the errors, in dev, for using a component as a class
 
 export { createAttachmentKey as attachment } from '../../attachments/index.ts';
 export { FILENAME, HMR, NAMESPACE_SVG } from '../../constants.ts';
@@ -111,11 +112,7 @@ export {
 	stopPropagation,
 	trusted
 } from './dom/legacy/event-modifiers.ts';
-export {
-	add_legacy_event_listener,
-	bubble_event,
-	update_legacy_props
-} from './dom/legacy/misc.ts';
+export { bubble_event } from './dom/legacy/misc.ts';
 export {
 	append,
 	comment,

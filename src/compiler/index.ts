@@ -11,6 +11,9 @@ export const compile: typeof svelte_compile = (source, options) => {
 	if ((options?.generate ?? 'client') === 'client') {
 		if (options?.experimental?.async) unsupported('`experimental.async` in the browser');
 		if (options?.experimental?.customRenderer) unsupported('custom renderers');
+		if (options?.compatibility?.componentApi === 4) {
+			unsupported('`compatibility.componentApi: 4`, which is deprecated: use `mount` instead');
+		}
 	}
 
 	// every component is a runes component, also one that uses no runes
