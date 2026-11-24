@@ -34,6 +34,17 @@ const cases: Record<string, { found: string[]; fine: string[] }> = {
 			`<script>import Child from './Child.svelte'; let { ondone } = $props();</script><Child {ondone} />`
 		]
 	},
+	component_event: {
+		found: [
+			`<script>import Child from './Child.svelte';</script><Child on:done={() => {}} />`,
+			`<script>import Child from './Child.svelte';</script><Child on:done|once={() => {}} />`,
+			`<script>let { Child } = $props();</script><Child on:done={() => {}} />`
+		],
+		fine: [
+			`<script>import Child from './Child.svelte';</script><Child ondone={() => {}} />`,
+			`<script>import Child from './Child.svelte';</script><Child {...{ ondone() {} }} />`
+		]
+	},
 	window_event_directive: {
 		found: [
 			`<svelte:window on:keydown={() => {}} />`,

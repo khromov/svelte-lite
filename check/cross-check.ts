@@ -39,6 +39,9 @@ const SILENT: Record<string, { when?: (finding: Finding) => boolean; why: string
 			'on `<svelte:window>`, `<svelte:document>` and `<svelte:body>`, `on:` is just as deprecated, ' +
 			'but the compiler only warns about it on elements'
 	},
+	component_event: {
+		why: 'the compiler does not warn about `on:` on a component, as the component may not be the author\'s to change'
+	},
 	event_forwarding: {
 		when: (finding) => finding.parent !== 'RegularElement' && finding.parent !== 'SvelteElement',
 		why: 'forwarding from a component or `<svelte:window>`: the compiler only warns about `on:` on elements'

@@ -148,6 +148,16 @@ export const RULES: Rule[] = [
 		}
 	},
 	{
+		code: 'component_event',
+		kind: 'deprecated',
+		node: 'OnDirective',
+		when: (node, context) => node.expression !== null && COMPONENTS.has(parent(context)!.type),
+		found: (node) => `\`${directive(node)}\` on a component, which listens to its events`,
+		instead: (node) =>
+			`pass a callback prop, \`on${node.name}={...}\`, and have the component call it` +
+			(node.modifiers.includes('once') ? ' (once: it can remember that it did)' : '')
+	},
+	{
 		code: 'window_event_directive',
 		kind: 'deprecated',
 		node: 'OnDirective',

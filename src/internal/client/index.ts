@@ -14,7 +14,7 @@
 //   `pop_renderer`, `cross`, `is_crossing`
 // - the deprecated `compatibility.componentApi: 4` option: `add_legacy_event_listener`,
 //   `update_legacy_props` (it also imports `createClassComponent` from `svelte/legacy`)
-// - deprecated syntax: the modifiers of `on:` on an element (`preventDefault`, `self`,
+// - deprecated syntax: the modifiers of `on:` (`once`, `preventDefault`, `self`,
 //   `stopImmediatePropagation`, `stopPropagation`, `trusted`), event forwarding (`bubble_event`)
 //
 // A component that needs one of these fails where it is compiled, see `src/compiler/index.ts`:
@@ -28,8 +28,8 @@
 //   also one in an event handler, and `assign_async` is `assign` for `object.x ??= await ...`
 // - `eager` and `pending` are `$state.eager(...)` and `$effect.pending()`, which compile without
 //   `experimental.async`
-// - `once` is the modifier of `on:` on a component, and `slot` and `sanitize_slots` are `<slot>`
-//   and `$$slots`, which a custom element renders its light DOM children with
+// - `slot` and `sanitize_slots` are `<slot>` and `$$slots`, which a custom element renders its
+//   light DOM children with
 // - `check_target` and `legacy_api` are the errors, in dev, for using a component as a class
 
 export { createAttachmentKey as attachment } from '../../attachments/index.ts';
@@ -109,7 +109,6 @@ export {
 } from './dom/elements/bindings/universal.ts';
 export { bind_window_scroll, bind_window_size } from './dom/elements/bindings/window.ts';
 export { hydrate_template, next, reset } from './dom/hydration.ts';
-export { once } from './dom/legacy/event-modifiers.ts';
 export {
 	append,
 	comment,
