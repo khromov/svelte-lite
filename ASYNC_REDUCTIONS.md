@@ -10,20 +10,27 @@ Compared here: Svelte 5.59.1 at [`90ad4e8`][svelte] and svelte-lite at [`70bb7c0
 
 ## In the bundle
 
-Gzipped bytes of a production build, measured by rebuilding the app after each removal.
+Each column is one small app, built for production and gzipped: a page with only
+`<h1>Hello</h1>`, a counter with one `$state` and one button, and a TodoMVC-style app of
+three components. The first row is what the app weighs with Svelte. Each row below it is how
+many bytes the app lost when that part was removed, measured by rebuilding after each removal.
 
-| What went | Static page | Counter | TodoMVC-style app |
+| | Static page | Counter | TodoMVC-style app |
 | --- | ---: | ---: | ---: |
-| Batches with their own view of the state, forks, pending tracking | 5,153 | 3,760 | 3,718 |
-| Blocks holding their DOM changes until the end of a flush | 909 | 965 | 1,564 |
-| The boundary that `mount()` wrapped every app in | 687 | 672 | 670 |
-| The `Batch` class and a version per dependency | 603 | 443 | 469 |
-| `await` in templates and deriveds | 0 | 629 | 600 |
-| **Total** | **7,352** | **6,469** | **7,021** |
-| Share of the app's size with Svelte | 61% | 50% | 39% |
+| **Size with Svelte** | **12,037** | **12,931** | **18,196** |
+| Batches with their own view of the state, forks, pending tracking | −5,153 | −3,760 | −3,718 |
+| Blocks holding their DOM changes until the end of a flush | −909 | −965 | −1,564 |
+| The boundary that `mount()` wrapped every app in | −687 | −672 | −670 |
+| The `Batch` class and a version per dependency | −603 | −443 | −469 |
+| `await` in templates and deriveds | 0 | −629 | −600 |
+| **Saved by dropping async** | **−7,352** | **−6,469** | **−7,021** |
+| As a share of the size with Svelte | 61% | 50% | 39% |
 
-The second row is an estimate: that code went in the same step as something else. The rest
-is measured.
+The block-deferral row is an estimate: that code went in the same step as something else.
+The rest is measured.
+
+These apps are smaller still in svelte-lite today (1,921, 3,027 and 8,268 bytes), because
+more than async went.
 
 ## In the source
 
