@@ -84,6 +84,7 @@ const extra = new Map<string, string[]>();
 const gaps = new Map<string, string[]>();
 const after_error = new Map<string, number>();
 const in_legacy_mode = new Map<string, string[]>();
+const ignored = new Map<string, string[]>();
 const stopped: Record<string, string[]> = {};
 
 const push = <T>(map: Map<string, T[]>, key: string, value: T) => map.set(key, [...(map.get(key) ?? []), value]);
@@ -152,6 +153,9 @@ for (const file of files) {
 			push(in_legacy_mode, finding.rule, `${relative}:${finding.line}:${finding.column}`);
 		} else if (SILENT[finding.rule] && (SILENT[finding.rule].when?.(finding) ?? true)) {
 			push(silent, finding.rule, `${relative}:${finding.line}:${finding.column}`);
+		} else if (/<!--\s*svelte-ignore[^>]*-->\s*$/.test(source.slice(0, finding.start))) {
+			// the warning is silenced, which does not make the syntax any more supported
+			push(ignored, finding.rule, `${relative}:${finding.line}:${finding.column}`);
 		} else {
 			push(extra, finding.rule, `${relative}:${finding.line}:${finding.column}`);
 			disagrees = true;
@@ -184,6 +188,9 @@ console.log('\nFindings of syntax the compiler says nothing about (see SILENT):'
 for (const [rule, entries] of [...silent].sort()) {
 	console.log(`  ${String(entries.length).padStart(5)}  ${rule}: ${SILENT[rule].why}${list(entries)}`);
 }
+
+console.log('\nFindings of syntax whose warning `<!-- svelte-ignore -->` silences:');
+for (const [rule, entries] of [...ignored].sort()) console.log(`  ${String(entries.length).padStart(5)}  ${rule}${list(entries)}`);
 
 console.log('\nFindings in a component that selects legacy mode, where the compiler takes legacy syntax and warns about nothing deprecated (`runes={false}` is matched):');
 for (const [rule, entries] of [...in_legacy_mode].sort()) console.log(`  ${String(entries.length).padStart(5)}  ${rule}${list(entries)}`);

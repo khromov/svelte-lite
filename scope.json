@@ -19,7 +19,8 @@
 		"slot-fill": "Filling a slot with `slot=\"...\"` or `<svelte:fragment>`, deprecated: passing a snippet takes its place. svelte-lite rejects them when compiling",
 		"let-directive": "`let:` directives, deprecated: a snippet that takes the values as parameters takes their place. svelte-lite rejects them when compiling",
 		"svelte-component": "`<svelte:component>`, deprecated: a component in a variable is used as a tag. svelte-lite rejects it when compiling",
-		"svelte-self": "`<svelte:self>`, deprecated: a component that imports itself takes its place. svelte-lite rejects it when compiling"
+		"svelte-self": "`<svelte:self>`, deprecated: a component that imports itself takes its place. svelte-lite rejects it when compiling",
+		"script-context": "`<script context=\"module\">`, deprecated: `<script module>` takes its place. svelte-lite rejects it when compiling"
 	},
 	"suites": {
 		"runtime-legacy": "legacy",
@@ -442,6 +443,7 @@
 			"rest-eachblock-binding-nested-rest": "legacy",
 			"runes-legacy-syntax-warnings": "on-directive",
 			"script-context-module-legacy": "legacy",
+			"script-context-module-runes-deprecated": "script-context",
 			"select-multiple": "legacy",
 			"silence-warnings": "legacy",
 			"silence-warnings-2": "legacy",

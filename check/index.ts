@@ -237,6 +237,14 @@ export const RULES: Rule[] = [
 		}
 	},
 	{
+		code: 'script_context',
+		kind: 'deprecated',
+		node: 'Attribute',
+		when: (node, context) => node.name === 'context' && parent(context)?.type === 'Script',
+		found: () => '`<script context="module">`',
+		instead: () => 'write `<script module>`'
+	},
+	{
 		code: 'window_event_directive',
 		kind: 'deprecated',
 		node: 'OnDirective',

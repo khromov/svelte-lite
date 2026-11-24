@@ -94,6 +94,10 @@ const cases: Record<string, { found: string[]; fine: string[] }> = {
 			`<script>import Tree from './Tree.svelte'; let { depth } = $props();</script>{#if depth > 0}<Tree depth={depth - 1} />{/if}`
 		]
 	},
+	script_context: {
+		found: [`<script context="module">export const a = 1;</script>`],
+		fine: [`<script module>export const a = 1;</script>`, `<script lang="ts">let a: number = 1;</script>`]
+	},
 	window_event_directive: {
 		found: [
 			`<svelte:window on:keydown={() => {}} />`,
