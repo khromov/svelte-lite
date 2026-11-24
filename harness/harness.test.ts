@@ -7,6 +7,7 @@ import type { Plugin } from 'vite';
 import { build } from './esbuild.ts';
 import { COMPAT, ROOT, UPSTREAM_PKG, UPSTREAM_SRC, UPSTREAM_TESTS, get_impl } from './paths.ts';
 import { suite_name } from './reporter.ts';
+import { removed_from } from './removed.ts';
 import { HarnessError, create_resolver, is_borrowed, is_reused, read_package, to_own } from './resolve.ts';
 import { svelte_impl } from './vite-plugin.ts';
 
@@ -289,6 +290,15 @@ describe('package.json', () => {
 
 			expect([key, missing]).toEqual([key, []]);
 		}
+	});
+
+	test('the server build of `svelte` has the exports of Svelte\'s, minus the removed ones', async () => {
+		const upstream = Object.keys(await import(path.join(UPSTREAM_SRC, 'index-server.js')));
+		const own = Object.keys(await import(path.join(ROOT, 'src/index-server.ts')));
+		const removed = removed_from('svelte');
+
+		expect(removed).not.toBe('*');
+		expect(own.sort()).toEqual(upstream.filter((name) => !(removed as Set<string>).has(name)).sort());
 	});
 
 	test('every entry point exists', () => {
