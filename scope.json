@@ -13,7 +13,8 @@
 		"motion-stores": "The deprecated `spring` and `tweened` stores of `svelte/motion`: the `Spring` and `Tween` classes take their place",
 		"svelte-legacy": "`svelte/legacy`, deprecated as a whole: `mount` and `hydrate` take the place of `createClassComponent` and `asClassComponent`, `$effect.pre` that of `run`, plain functions that of `handlers` and the event modifier functions, callback props that of `createBubbler`",
 		"component-api-4": "The deprecated `compatibility.componentApi: 4` compiler option, which makes components classes through `svelte/legacy`: `mount` takes its place",
-		"on-directive": "`on:` directives on elements, deprecated: event attributes (`onclick`) take their place. svelte-lite rejects them when compiling"
+		"on-directive": "`on:` directives on elements, deprecated: event attributes (`onclick`) take their place. svelte-lite rejects them when compiling",
+		"event-forwarding": "Event forwarding (`on:click` without a handler), deprecated: a callback prop that the component passes on takes its place. svelte-lite rejects it when compiling"
 	},
 	"suites": {
 		"runtime-legacy": "legacy",
@@ -224,8 +225,11 @@
 			"event-arguments": "on-directive",
 			"event-arguments-2": "on-directive",
 			"event-attribute-after-binding": "delegation",
+			"event-attribute-delegation-4": "event-forwarding",
 			"event-attribute-delegation-5": "delegation",
+			"event-attribute-spread-collision": "event-forwarding",
 			"event-exported": "on-directive",
+			"event-listener-spread": "event-forwarding",
 			"event-on-2": "on-directive",
 			"event-used-in-component-and-element": "on-directive",
 			"exports-1": "on-directive",

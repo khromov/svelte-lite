@@ -29,11 +29,20 @@ const GATED_ERRORS = new Set([
 	'svelte_options_customrenderer_disabled'
 ]);
 
-/** The compiler says nothing about these, which is why they are rules: see the report */
-const SILENT: Record<string, string> = {
-	window_event_directive:
-		'on `<svelte:window>`, `<svelte:document>` and `<svelte:body>`, `on:` is just as deprecated, ' +
-		'but the compiler only warns about it on elements'
+/**
+ * Deprecated syntax that the compiler says nothing about, by rule: all findings of the rule,
+ * or those that `when` picks
+ */
+const SILENT: Record<string, { when?: (finding: Finding) => boolean; why: string }> = {
+	window_event_directive: {
+		why:
+			'on `<svelte:window>`, `<svelte:document>` and `<svelte:body>`, `on:` is just as deprecated, ' +
+			'but the compiler only warns about it on elements'
+	},
+	event_forwarding: {
+		when: (finding) => finding.parent !== 'RegularElement' && finding.parent !== 'SvelteElement',
+		why: 'forwarding from a component or `<svelte:window>`: the compiler only warns about `on:` on elements'
+	}
 };
 
 interface Signal {
@@ -135,7 +144,7 @@ for (const file of files) {
 		} else if (legacy_mode && finding.kind === 'legacy') {
 			// what only legacy mode has is fine there, and `runes={false}` is the finding
 			push(in_legacy_mode, finding.rule, `${relative}:${finding.line}:${finding.column}`);
-		} else if (SILENT[finding.rule]) {
+		} else if (SILENT[finding.rule] && (SILENT[finding.rule].when?.(finding) ?? true)) {
 			push(silent, finding.rule, `${relative}:${finding.line}:${finding.column}`);
 		} else {
 			push(extra, finding.rule, `${relative}:${finding.line}:${finding.column}`);
@@ -167,7 +176,7 @@ for (const [rule, n] of [...matched].sort()) console.log(`  ${String(n).padStart
 
 console.log('\nFindings of syntax the compiler says nothing about (see SILENT):');
 for (const [rule, entries] of [...silent].sort()) {
-	console.log(`  ${String(entries.length).padStart(5)}  ${rule}: ${SILENT[rule]}${list(entries)}`);
+	console.log(`  ${String(entries.length).padStart(5)}  ${rule}: ${SILENT[rule].why}${list(entries)}`);
 }
 
 console.log('\nFindings of legacy syntax in a component that selects legacy mode (matched by `runes={false}`):');

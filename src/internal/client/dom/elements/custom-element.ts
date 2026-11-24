@@ -29,8 +29,6 @@ if (typeof HTMLElement === 'function') {
 		$$c: any;
 		/** The props the component was mounted with, see `element_props` */
 		$$v: Record<string | symbol, any> = {};
-		/** The handlers of the component's events, by event type */
-		$$e: Record<string, Function[]> = {};
 		/** Whether or not the custom element is connected */
 		$$cn = false;
 		/** Component props data */
@@ -39,10 +37,6 @@ if (typeof HTMLElement === 'function') {
 		$$r = false;
 		/** Props definition (name, reflected, type etc) */
 		$$p_d: PropDefinitions = {};
-		/** Event listeners */
-		$$l: Record<string, EventListenerOrEventListenerObject[]> = {};
-		/** Event listener unsubscribe functions */
-		$$l_u = new Map<EventListenerOrEventListenerObject, Function>();
 		/** The managed render effect for reflecting attributes */
 		$$me: any;
 		/** The ShadowRoot of the custom element */
@@ -64,37 +58,10 @@ if (typeof HTMLElement === 'function') {
 			}
 		}
 
-		override addEventListener(
-			type: string,
-			listener: EventListenerOrEventListenerObject,
-			options?: boolean | AddEventListenerOptions
-		) {
-			// We can't determine upfront if the event is a custom event or not, so we have to
-			// listen to both. If someone uses a custom event with the same name as a regular
-			// browser event, this fires twice - we can't avoid that.
-			this.$$l[type] = this.$$l[type] || [];
-			this.$$l[type].push(listener);
-			if (this.$$c) {
-				const unsub = this.$$on(type, listener);
-				this.$$l_u.set(listener, unsub);
-			}
-			super.addEventListener(type, listener, options);
-		}
-
-		override removeEventListener(
-			type: string,
-			listener: EventListenerOrEventListenerObject,
-			options?: boolean | AddEventListenerOptions
-		) {
-			super.removeEventListener(type, listener, options);
-			if (this.$$c) {
-				const unsub = this.$$l_u.get(listener);
-				if (unsub) {
-					unsub();
-					this.$$l_u.delete(listener);
-				}
-			}
-		}
+		// The listeners of the element see the events that the component dispatches on it
+		// (`$host().dispatchEvent(...)`). In Svelte they also get the component's own events,
+		// those of `createEventDispatcher` and of forwarding (`<button on:click>`): svelte-lite
+		// has neither, so `addEventListener` is the element's own
 
 		async connectedCallback() {
 			this.$$cn = true;
@@ -131,12 +98,7 @@ if (typeof HTMLElement === 'function') {
 						delete own_props[key]; // remove the property that shadows the getter/setter
 					}
 				}
-				this.$$v = element_props({
-					...this.$$d,
-					$$slots,
-					$$host: this,
-					$$events: (this.$$e = {})
-				});
+				this.$$v = element_props({ ...this.$$d, $$slots, $$host: this });
 				this.$$c = mount(this.$$ctor, {
 					target: this.$$shadowRoot || this,
 					props: this.$$v,
@@ -165,28 +127,7 @@ if (typeof HTMLElement === 'function') {
 						this.$$r = false;
 					});
 				});
-
-				for (const type in this.$$l) {
-					for (const listener of this.$$l[type]) {
-						const unsub = this.$$on(type, listener);
-						this.$$l_u.set(listener, unsub);
-					}
-				}
-				this.$$l = {};
 			}
-		}
-
-		/**
-		 * Adds a handler of the events that the component forwards (`<button on:click>`), and
-		 * returns the function that removes it
-		 */
-		$$on(type: string, listener: EventListenerOrEventListenerObject) {
-			const handler = (...args: any[]) => (listener as Function).call(this, ...args);
-			(this.$$e[type] ||= []).push(handler);
-
-			return () => {
-				this.$$e[type] = this.$$e[type].filter((fn) => fn !== handler);
-			};
 		}
 
 		// We don't need this when working within Svelte code, but for compatibility of people using this outside of Svelte

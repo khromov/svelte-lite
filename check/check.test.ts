@@ -23,6 +23,17 @@ const cases: Record<string, { found: string[]; fine: string[] }> = {
 		],
 		fine: [`<button onclick={() => {}}>x</button>`, `<div onclickcapture={() => {}}></div>`]
 	},
+	event_forwarding: {
+		found: [
+			`<button on:click>x</button>`,
+			`<script>import Child from './Child.svelte';</script><Child on:done />`,
+			`<svelte:window on:resize />`
+		],
+		fine: [
+			`<script>let { onclick } = $props();</script><button {onclick}>x</button>`,
+			`<script>import Child from './Child.svelte'; let { ondone } = $props();</script><Child {ondone} />`
+		]
+	},
 	window_event_directive: {
 		found: [
 			`<svelte:window on:keydown={() => {}} />`,

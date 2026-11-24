@@ -20,6 +20,9 @@ export interface Finding {
 	/** The rule that found it, or `parse_error` */
 	rule: string;
 	kind: Kind | 'parse error';
+	/** The type of the node, and of its parent, as Svelte's parser names them */
+	node: string | null;
+	parent: string | null;
 	/** Offsets in the source */
 	start: number;
 	end: number;
@@ -83,6 +86,8 @@ const ELEMENTS = new Set(['RegularElement', 'SvelteElement']);
 /** The special elements that `on:` can listen on as well */
 const TARGETS = new Set(['SvelteWindow', 'SvelteDocument', 'SvelteBody']);
 
+const COMPONENTS = new Set(['Component', 'SvelteComponent', 'SvelteSelf']);
+
 /** `on:click|once|preventDefault` */
 const directive = (node: Node) => ['on:' + node.name, ...node.modifiers].join('|');
 
@@ -127,6 +132,20 @@ export const RULES: Rule[] = [
 		when: (node, context) => node.expression !== null && ELEMENTS.has(parent(context)!.type),
 		found: (node) => `\`${directive(node)}\`, an \`on:\` directive`,
 		instead: event_attribute
+	},
+	{
+		code: 'event_forwarding',
+		kind: 'deprecated',
+		node: 'OnDirective',
+		when: (node) => node.expression === null,
+		found: (node) => `\`${directive(node)}\` without a handler, which forwards the event`,
+		instead: (node, context) => {
+			const element = parent(context)!;
+			const prop = `on${node.name}`;
+			return COMPONENTS.has(element.type)
+				? `accept an \`${prop}\` callback prop and pass it on: \`<${element.name} {${prop}} />\``
+				: `accept an \`${prop}\` callback prop and pass it to the element: \`<${element.name} {${prop}}>\``;
+		}
 	},
 	{
 		code: 'window_event_directive',
@@ -296,6 +315,8 @@ export function check(source: string, options: CheckOptions = {}): Finding[] {
 			{
 				rule: 'parse_error',
 				kind: 'parse error',
+				node: null,
+				parent: null,
 				start,
 				end: error.position?.[1] ?? start,
 				...locate(start),
@@ -326,6 +347,8 @@ export function check(source: string, options: CheckOptions = {}): Finding[] {
 			findings.push({
 				rule: rule.code,
 				kind: rule.kind,
+				node: node.type,
+				parent: path.at(-1)?.type ?? null,
 				start: node.start,
 				end: node.end,
 				...locate(node.start),
