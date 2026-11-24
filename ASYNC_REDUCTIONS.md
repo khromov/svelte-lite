@@ -29,7 +29,7 @@ many bytes the app lost when that part was removed, measured by rebuilding after
 The block-deferral row is an estimate: that code went in the same step as something else.
 The rest is measured.
 
-These apps are smaller still in svelte-lite today (1,921, 3,027 and 8,268 bytes), because
+These apps are smaller still in svelte-lite today (1,896, 3,004 and 8,237 bytes), because
 more than async went.
 
 ## In the source
