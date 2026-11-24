@@ -28,48 +28,15 @@ export type ComponentContext = {
 	/** True if initialized, i.e. pop() ran */
 	i: boolean;
 	/**
-	 * props — needed for legacy mode lifecycle functions, and for `createEventDispatcher`
-	 * @deprecated remove in 6.0
-	 */
-	s: Record<string, unknown>;
-	/**
-	 * exports (and props, if `accessors: true`) — needed for `createEventDispatcher`
-	 * @deprecated remove in 6.0
-	 */
-	x: Record<string, any> | null;
-	/**
 	 * The parent effect of this component
 	 * TODO 6.0 this is used to control `bind:this` timing that might change,
 	 * in which case we can remove this property
 	 */
 	r: Effect;
 	/**
-	 * legacy stuff
-	 * @deprecated remove in 6.0
-	 */
-	l: null | {
-		/** local signals (needed for beforeUpdate/afterUpdate) */
-		s: null | Source[];
-		/** update_callbacks */
-		u: null | {
-			/** afterUpdate callbacks */
-			a: Array<() => void>;
-			/** beforeUpdate callbacks */
-			b: Array<() => void>;
-			/** onMount callbacks */
-			m: Array<() => any>;
-		};
-		/** `$:` statements */
-		$: any[];
-	};
-	/**
 	 * dev mode only: the component function
 	 */
 	function?: any;
-};
-
-export type ComponentContextLegacy = ComponentContext & {
-	l: NonNullable<ComponentContext['l']>;
 };
 
 export type Equals = (this: Pick<Value, 'v'>, value: unknown) => boolean;

@@ -12,8 +12,16 @@
 //   `wait`, `for_await_track_reactivity_loss`
 // - custom renderers: `renderer_snippet`, `validate_snippet_renderer`, `push_renderer`,
 //   `pop_renderer`, `cross`, `is_crossing`
+// - the deprecated `compatibility.componentApi: 4` option: `add_legacy_event_listener`,
+//   `update_legacy_props` (it also imports `createClassComponent` from `svelte/legacy`)
+// - deprecated syntax: the modifiers of `on:` (`once`, `preventDefault`, `self`,
+//   `stopImmediatePropagation`, `stopPropagation`, `trusted`), event forwarding (`bubble_event`),
+//   `let:` (`invalid_default_snippet`)
 //
-// A component that needs one of these fails where it is compiled, see `src/compiler/index.ts`.
+// A component that needs one of these fails where it is compiled, see `src/compiler/index.ts`:
+// a deprecated option there, deprecated syntax in `check/index.ts`, which also rejects the
+// deprecated syntax whose helpers are shared with what is not deprecated (`on:click` on an
+// element is `event`, as `onclick` is when it is not delegated).
 //
 // Some of what stays looks like it belongs to those features and does not:
 //
@@ -21,10 +29,9 @@
 //   also one in an event handler, and `assign_async` is `assign` for `object.x ??= await ...`
 // - `eager` and `pending` are `$state.eager(...)` and `$effect.pending()`, which compile without
 //   `experimental.async`
-// - the event modifiers, `bubble_event`, `slot` and `sanitize_slots` are `on:` and `<slot>`,
-//   which are deprecated and still valid in a runes component
-// - `add_legacy_event_listener` and `update_legacy_props` are the `compatibility.componentApi: 4`
-//   option, `check_target` and `legacy_api` the errors for using a component as a class without it
+// - `slot` and `sanitize_slots` are `<slot>` and `$$slots`, which a custom element renders its
+//   light DOM children with
+// - `check_target` and `legacy_api` are the errors, in dev, for using a component as a class
 
 export { createAttachmentKey as attachment } from '../../attachments/index.ts';
 export { FILENAME, HMR, NAMESPACE_SVG } from '../../constants.ts';
@@ -104,19 +111,6 @@ export {
 export { bind_window_scroll, bind_window_size } from './dom/elements/bindings/window.ts';
 export { hydrate_template, next, reset } from './dom/hydration.ts';
 export {
-	once,
-	preventDefault,
-	self,
-	stopImmediatePropagation,
-	stopPropagation,
-	trusted
-} from './dom/legacy/event-modifiers.ts';
-export {
-	add_legacy_event_listener,
-	bubble_event,
-	update_legacy_props
-} from './dom/legacy/misc.ts';
-export {
 	append,
 	comment,
 	from_html,
@@ -179,7 +173,6 @@ export { attr, clsx } from '../shared/attributes.ts';
 export { snapshot } from '../shared/clone.ts';
 export { noop, fallback, to_array, exclude_from_object } from '../shared/utils.ts';
 export {
-	invalid_default_snippet,
 	validate_dynamic_element_tag,
 	validate_store,
 	validate_void_dynamic_element,

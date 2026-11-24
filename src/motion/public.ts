@@ -1,5 +1,3 @@
-import type { Readable, Unsubscriber } from '../store/public.ts';
-
 export interface SpringOptions {
 	stiffness?: number;
 	damping?: number;
@@ -7,50 +5,15 @@ export interface SpringOptions {
 }
 
 export interface SpringUpdateOptions {
-	/**
-	 * @deprecated Only use this for the spring store; does nothing when set on the Spring class
-	 */
-	hard?: any;
-	/**
-	 * @deprecated Only use this for the spring store; does nothing when set on the Spring class
-	 */
-	soft?: string | number | boolean;
-	/**
-	 * Only use this for the Spring class; does nothing when set on the spring store
-	 */
 	instant?: boolean;
-	/**
-	 * Only use this for the Spring class; does nothing when set on the spring store
-	 */
 	preserveMomentum?: number;
 }
-
-export type Updater<T> = (target_value: T, value: T) => T;
 
 export interface TweenOptions<T> {
 	delay?: number;
 	duration?: number | ((from: T, to: T) => number);
 	easing?: (t: number) => number;
 	interpolate?: (a: T, b: T) => (t: number) => T;
-}
-
-// TODO we do declaration merging here in order to not have a breaking change (renaming the Spring interface)
-// this means both the Spring class and the Spring interface are merged into one with some things only
-// existing on one side. In Svelte 6, remove the type definition and move the jsdoc onto the class in spring.ts
-
-export interface Spring<T> extends Readable<T> {
-	set(new_value: T, opts?: SpringUpdateOptions): Promise<void>;
-	/**
-	 * @deprecated Only exists on the legacy `spring` store, not the `Spring` class
-	 */
-	update: (fn: Updater<T>, opts?: SpringUpdateOptions) => Promise<void>;
-	/**
-	 * @deprecated Only exists on the legacy `spring` store, not the `Spring` class
-	 */
-	subscribe(fn: (value: T) => void): Unsubscriber;
-	precision: number;
-	damping: number;
-	stiffness: number;
 }
 
 /**
@@ -103,19 +66,12 @@ export declare class Spring<T> {
 	stiffness: number;
 	/**
 	 * The end value of the spring.
-	 * This property only exists on the `Spring` class, not the legacy `spring` store.
 	 */
 	target: T;
 	/**
 	 * The current value of the spring.
-	 * This property only exists on the `Spring` class, not the legacy `spring` store.
 	 */
 	get current(): T;
 }
 
-export interface Tweened<T> extends Readable<T> {
-	set(value: T, opts?: TweenOptions<T>): Promise<void>;
-	update(updater: Updater<T>, opts?: TweenOptions<T>): Promise<void>;
-}
-
-export { prefersReducedMotion, spring, tweened, Tween } from './index.ts';
+export { prefersReducedMotion, Tween } from './index.ts';

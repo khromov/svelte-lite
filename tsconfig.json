@@ -23,6 +23,7 @@
 	},
 	"include": [
 		"src",
+		"check",
 		"compat",
 		"harness",
 		"scripts",

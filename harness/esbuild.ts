@@ -6,6 +6,7 @@
  */
 import * as esbuild from 'esbuild';
 import { ROOT, UPSTREAM_SRC, is_inside } from './paths.ts';
+import { removed_entry_point, stand_in } from './removed.ts';
 import { create_resolver, is_reused, read_package, require_compat, to_own } from './resolve.ts';
 import fs from 'node:fs';
 
@@ -59,6 +60,12 @@ function svelte_lite(): esbuild.Plugin {
 			// resolving the package through its own name lets esbuild pick the export
 			// condition, the same way it would for an installed copy
 			build.onResolve({ filter: /^svelte(\/|$)/ }, async (args) => {
+				const support = stand_in(args.path, args.importer);
+				if (support) return { path: support };
+
+				const removed = removed_entry_point(args.path);
+				if (removed) return { errors: [{ text: removed }] };
+
 				const result = await build.resolve(name + args.path.slice('svelte'.length), {
 					kind: args.kind,
 					resolveDir: ROOT

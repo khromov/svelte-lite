@@ -69,7 +69,10 @@ export const ERROR_VALUE = 1 << 23;
 export const STATE_SYMBOL = Symbol('$state');
 /** Marks component export objects, so that `proxy(...)` leaves them untouched */
 export const COMPONENT_SYMBOL = Symbol('component');
-/** For legacy mode, which svelte-lite leaves out. The modules borrowed from Svelte read it */
+/**
+ * Marks the props of the component of a custom element as the props it was mounted with,
+ * despite its name: in Svelte, it is also for legacy mode, which svelte-lite leaves out
+ */
 export const LEGACY_PROPS = Symbol('legacy props');
 export const LOADING_ATTR_SYMBOL = Symbol('');
 export const PROXY_PATH_SYMBOL = Symbol('proxy path');

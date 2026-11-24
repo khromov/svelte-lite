@@ -5,7 +5,7 @@ import { MediaQuery } from 'svelte/reactivity';
 
 export * from './spring.ts';
 export * from './tweened.ts';
-export type { SpringOptions, SpringUpdateOptions, TweenOptions, Tweened, Updater } from './public.ts';
+export type { SpringOptions, SpringUpdateOptions, TweenOptions } from './public.ts';
 
 /**
  * A [media query](https://svelte.dev/docs/svelte/svelte-reactivity#MediaQuery) that matches if the user [prefers reduced motion](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion).

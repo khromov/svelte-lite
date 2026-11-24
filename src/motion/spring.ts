@@ -1,7 +1,6 @@
 import type { Source, Task } from '../internal/client/types.ts';
 import type { TickContext } from './private.ts';
-import type { Spring as SpringStore, SpringOptions, SpringUpdateOptions } from './public.ts';
-import { writable } from '../store/shared/index.ts';
+import type { SpringOptions, SpringUpdateOptions } from './public.ts';
 import { loop } from '../internal/client/loop.ts';
 import { raf } from '../internal/client/timing.ts';
 import { is_date } from './utils.ts';
@@ -41,89 +40,6 @@ function tick_spring(ctx: TickContext, last_value: any, current_value: any, targ
 	} else {
 		throw new Error(`Cannot spring ${typeof current_value} values`);
 	}
-}
-
-/**
- * The spring function in Svelte creates a store whose value is animated, with a motion that simulates the behavior of a spring. This means when the value changes, instead of transitioning at a steady rate, it "bounces" like a spring would, depending on the physics parameters provided. This adds a level of realism to the transitions and can enhance the user experience.
- *
- * @deprecated Use [`Spring`](https://svelte.dev/docs/svelte/svelte-motion#Spring) instead
- */
-export function spring<T = any>(value?: T, opts: SpringOptions = {}): SpringStore<T> {
-	const store = writable(value);
-	const { stiffness = 0.15, damping = 0.8, precision = 0.01 } = opts;
-	let last_time: number;
-	let task: Task | null;
-	let current_token: object;
-
-	let last_value = value as T;
-	let target_value = value;
-
-	let inv_mass = 1;
-	let inv_mass_recovery_rate = 0;
-	let cancel_task = false;
-
-	function set(new_value: T, opts: SpringUpdateOptions = {}): Promise<void> {
-		target_value = new_value;
-		const token = (current_token = {});
-		if (value == null || opts.hard || (spring.stiffness >= 1 && spring.damping >= 1)) {
-			cancel_task = true; // cancel any running animation
-			last_time = raf.now();
-			last_value = new_value;
-			store.set((value = target_value));
-			return Promise.resolve();
-		} else if (opts.soft) {
-			const rate = opts.soft === true ? 0.5 : +opts.soft;
-			inv_mass_recovery_rate = 1 / (rate * 60);
-			inv_mass = 0; // infinite mass, unaffected by spring forces
-		}
-		if (!task) {
-			last_time = raf.now();
-			cancel_task = false;
-			task = loop((now) => {
-				if (cancel_task) {
-					cancel_task = false;
-					task = null;
-					return false;
-				}
-				inv_mass = Math.min(inv_mass + inv_mass_recovery_rate, 1);
-
-				// clamp elapsed time to 1/30th of a second, so that longer pauses
-				// (blocked thread or inactive tab) don't cause the spring to go haywire
-				const elapsed = Math.min(now - last_time, 1000 / 30);
-
-				const ctx: TickContext = {
-					inv_mass,
-					opts: spring,
-					settled: true,
-					dt: (elapsed * 60) / 1000
-				};
-				const next_value = tick_spring(ctx, last_value, value as T, target_value as T);
-				last_time = now;
-				last_value = value as T;
-				store.set((value = next_value));
-				if (ctx.settled) {
-					task = null;
-				}
-				return !ctx.settled;
-			});
-		}
-		return new Promise((fulfil) => {
-			(task as Task).promise.then(() => {
-				if (token === current_token) fulfil();
-			});
-		});
-	}
-
-	// @ts-expect-error - class-only properties are missing
-	const spring: SpringStore<T> = {
-		set,
-		update: (fn, opts) => set(fn(target_value as T, value as T), opts),
-		subscribe: store.subscribe,
-		stiffness,
-		damping,
-		precision
-	};
-	return spring;
 }
 
 /**

@@ -203,9 +203,9 @@ export function prop<V>(
 	let setter: ((v: V) => void) | undefined;
 
 	if (bindable) {
-		// Can be the case when someone does `mount(Component, props)` with `let props = $state({...})`
-		// or `createClassComponent(Component, props)`. The latter is not legacy mode despite the
-		// name of the symbol: `svelte/legacy` and custom elements mount runes components that way
+		// Can be the case when someone does `mount(Component, props)` with `let props = $state({...})`,
+		// and for the component of a custom element. The latter is not legacy mode despite the
+		// name of the symbol (see `element_props` in custom-element.ts)
 		var is_entry_props = STATE_SYMBOL in props || LEGACY_PROPS in props;
 
 		setter =

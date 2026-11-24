@@ -1,5 +1,10 @@
-import { createClassComponent } from '../../../../legacy/legacy-client.ts';
+import type { Source } from '../../types.ts';
+import { LEGACY_PROPS } from '../../constants.ts';
 import { effect_root, render_effect } from '../../reactivity/effects.ts';
+import { safe_equals } from '../../reactivity/equality.ts';
+import { set, source } from '../../reactivity/sources.ts';
+import { mount, unmount } from '../../render.ts';
+import { get } from '../../runtime.ts';
 import { append } from '../template.ts';
 import { define_property, get_descriptor, object_keys } from '../../../shared/utils.ts';
 import { create_element } from '../operations.ts';
@@ -22,6 +27,8 @@ if (typeof HTMLElement === 'function') {
 		$$s: string[];
 		/** The Svelte component instance */
 		$$c: any;
+		/** The props the component was mounted with, see `element_props` */
+		$$v: Record<string | symbol, any> = {};
 		/** Whether or not the custom element is connected */
 		$$cn = false;
 		/** Component props data */
@@ -30,10 +37,6 @@ if (typeof HTMLElement === 'function') {
 		$$r = false;
 		/** Props definition (name, reflected, type etc) */
 		$$p_d: PropDefinitions = {};
-		/** Event listeners */
-		$$l: Record<string, EventListenerOrEventListenerObject[]> = {};
-		/** Event listener unsubscribe functions */
-		$$l_u = new Map<EventListenerOrEventListenerObject, Function>();
 		/** The managed render effect for reflecting attributes */
 		$$me: any;
 		/** The ShadowRoot of the custom element */
@@ -55,37 +58,10 @@ if (typeof HTMLElement === 'function') {
 			}
 		}
 
-		override addEventListener(
-			type: string,
-			listener: EventListenerOrEventListenerObject,
-			options?: boolean | AddEventListenerOptions
-		) {
-			// We can't determine upfront if the event is a custom event or not, so we have to
-			// listen to both. If someone uses a custom event with the same name as a regular
-			// browser event, this fires twice - we can't avoid that.
-			this.$$l[type] = this.$$l[type] || [];
-			this.$$l[type].push(listener);
-			if (this.$$c) {
-				const unsub = this.$$c.$on(type, listener);
-				this.$$l_u.set(listener, unsub);
-			}
-			super.addEventListener(type, listener, options);
-		}
-
-		override removeEventListener(
-			type: string,
-			listener: EventListenerOrEventListenerObject,
-			options?: boolean | AddEventListenerOptions
-		) {
-			super.removeEventListener(type, listener, options);
-			if (this.$$c) {
-				const unsub = this.$$l_u.get(listener);
-				if (unsub) {
-					unsub();
-					this.$$l_u.delete(listener);
-				}
-			}
-		}
+		// The listeners of the element see the events that the component dispatches on it
+		// (`$host().dispatchEvent(...)`). In Svelte they also get the component's own events,
+		// those of `createEventDispatcher` and of forwarding (`<button on:click>`): svelte-lite
+		// has neither, so `addEventListener` is the element's own
 
 		async connectedCallback() {
 			this.$$cn = true;
@@ -122,14 +98,11 @@ if (typeof HTMLElement === 'function') {
 						delete own_props[key]; // remove the property that shadows the getter/setter
 					}
 				}
-				this.$$c = createClassComponent({
-					component: this.$$ctor,
+				this.$$v = element_props({ ...this.$$d, $$slots, $$host: this });
+				this.$$c = mount(this.$$ctor, {
 					target: this.$$shadowRoot || this,
-					props: {
-						...this.$$d,
-						$$slots,
-						$$host: this
-					}
+					props: this.$$v,
+					intro: false
 				});
 
 				// Reflect component props as attributes
@@ -154,14 +127,6 @@ if (typeof HTMLElement === 'function') {
 						this.$$r = false;
 					});
 				});
-
-				for (const type in this.$$l) {
-					for (const listener of this.$$l[type]) {
-						const unsub = this.$$c.$on(type, listener);
-						this.$$l_u.set(listener, unsub);
-					}
-				}
-				this.$$l = {};
 			}
 		}
 
@@ -171,7 +136,7 @@ if (typeof HTMLElement === 'function') {
 			if (this.$$r) return;
 			attr = this.$$g_p(attr);
 			this.$$d[attr] = get_custom_element_value(attr, newValue, this.$$p_d, 'toProp');
-			this.$$c?.$set({ [attr]: this.$$d[attr] });
+			if (this.$$c) this.$$v[attr] = this.$$d[attr];
 		}
 
 		disconnectedCallback() {
@@ -179,7 +144,7 @@ if (typeof HTMLElement === 'function') {
 			// In a microtask, because this could be a move within the DOM
 			Promise.resolve().then(() => {
 				if (!this.$$cn && this.$$c) {
-					this.$$c.$destroy();
+					unmount(this.$$c);
 					this.$$me();
 					this.$$c = undefined;
 				}
@@ -197,6 +162,42 @@ if (typeof HTMLElement === 'function') {
 			);
 		}
 	};
+}
+
+/**
+ * The props of the component of a custom element. Each one is a signal of its own, created
+ * when it is first read or set, and setting one to the object it already holds notifies,
+ * because the object may have been mutated. Unlike a `$state` proxy, an object that is
+ * passed in stays as it is. Custom elements were built on `createClassComponent` of
+ * `svelte/legacy`, and this is the part of it that they need.
+ */
+function element_props(initial: Record<string | symbol, any>) {
+	const sources = new Map<string | symbol, Source<any>>();
+
+	const add_source = (key: string | symbol, value: unknown) => {
+		const s = source(value);
+		s.equals = safe_equals;
+		sources.set(key, s);
+		return s;
+	};
+
+	return new Proxy(initial, {
+		get(target, prop) {
+			return get(sources.get(prop) ?? add_source(prop, Reflect.get(target, prop)));
+		},
+		has(target, prop) {
+			// the component writes a bound prop back to the props it was mounted with (see `prop`),
+			// instead of treating it as a prop that its parent did not bind
+			if (prop === LEGACY_PROPS) return true;
+
+			get(sources.get(prop) ?? add_source(prop, Reflect.get(target, prop)));
+			return Reflect.has(target, prop);
+		},
+		set(target, prop, value) {
+			set(sources.get(prop) ?? add_source(prop, value), value);
+			return Reflect.set(target, prop, value);
+		}
+	});
 }
 
 /** A snippet that renders the `<slot>` through which the element's light DOM children show */
@@ -300,7 +301,7 @@ export function create_custom_element(
 					if (setter) {
 						component[prop] = value;
 					} else {
-						component.$set({ [prop]: value });
+						this.$$v[prop] = value;
 					}
 				}
 			}

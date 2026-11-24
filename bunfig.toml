@@ -1,4 +1,5 @@
 [test]
-# `bun test` runs only the harness's own unit tests. The upstream Svelte suite
-# under vendor/ is vitest-based and runs through `bun run test`.
-root = "harness"
+# `bun test` runs the unit tests of the harness and of the syntax check. The upstream Svelte
+# suite under vendor/ is vitest-based and runs through `bun run test`.
+root = "."
+pathIgnorePatterns = ["vendor/**", "node_modules/**", "playground/**", ".claude/**"]

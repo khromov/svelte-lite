@@ -50,9 +50,8 @@ export function create_ownership_validator(props: Record<string, any>) {
 }
 
 function is_bound_or_unset(props: Record<string, any>, prop_name: string): boolean {
-	// Can be the case when someone does `mount(Component, props)` with `let props = $state({...})`
-	// or `createClassComponent(Component, props)`. The latter is `svelte/legacy`, which wraps
-	// components of any kind and marks the props it creates with `LEGACY_PROPS`
+	// Can be the case when someone does `mount(Component, props)` with `let props = $state({...})`,
+	// and for the component of a custom element, whose props are marked with `LEGACY_PROPS`
 	const is_entry_props = STATE_SYMBOL in props || LEGACY_PROPS in props;
 	return (
 		!!get_descriptor(props, prop_name)?.set ||

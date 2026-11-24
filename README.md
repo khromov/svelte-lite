@@ -1,8 +1,9 @@
 # svelte-lite
 
 A lean client runtime for Svelte 5, written in TypeScript. It runs the output of Svelte's own
-compiler, leaves out the features that cost every app bytes whether it uses them or not, and is
-measured against Svelte's own test suite, run unchanged from a pinned checkout of
+compiler, leaves out the features that cost every app bytes whether it uses them or not and the
+API and syntax that Svelte deprecates, and is measured against Svelte's own test suite, run
+unchanged from a pinned checkout of
 [sveltejs/svelte](https://github.com/sveltejs/svelte).
 
 Only the client runtime is svelte-lite's own. The compiler and the server runtime never reach
@@ -28,9 +29,11 @@ for the browser tests.
 | `bun run test` | The Svelte suite against svelte-lite |
 | `bun run test:upstream` | The same suite against Svelte itself, as a control and baseline |
 | `bun run test:prod` | Runs the samples of the main runtime suite as production bundles (`--minify` adds terser) |
-| `bun run test:types` | Svelte's type tests against svelte-lite, minus the parts that cover custom renderers (`SVELTE_IMPL=upstream` for the control) |
-| `bun test` | Unit tests of the harness |
+| `bun run test:types` | Svelte's type tests against svelte-lite, minus the parts that cover custom renderers and the removed API (`SVELTE_IMPL=upstream` for the control) |
+| `bun test` | Unit tests of the harness and of the syntax check |
 | `bun run check` | Type-checks this repo's own code |
+| `bun run check:syntax <paths>` | Finds the syntax svelte-lite does not support in `.svelte` files, see [The syntax check](#the-syntax-check) |
+| `bun check/cross-check.ts` | Compares the syntax check with Svelte's compiler over the components of the suite (`--files` lists them) |
 | `bun run size` | Bundle size of small apps, compared with Svelte (`SVELTE_IMPL=upstream` measures the reference) |
 | `bun run borrowed` | Lists the client modules that are still Svelte's |
 | `bun run scope` | Counts the tests that are out of scope, by the feature left out |
@@ -59,13 +62,13 @@ Gzipped, against Svelte 5.59.1:
 
 | App | svelte-lite | Svelte | |
 | --- | ---: | ---: | ---: |
-| A static page | 1,921 B | 12,037 B | −84% |
-| A counter | 3,027 B | 12,931 B | −77% |
-| The same, hydrated | 3,513 B | 13,653 B | −74% |
-| A keyed list | 5,493 B | 14,754 B | −63% |
-| An element with spread attributes | 6,072 B | 16,547 B | −63% |
-| A TodoMVC-style app, three components | 8,268 B | 18,196 B | −55% |
-| The same with a transition and an animation | 10,595 B | 20,050 B | −47% |
+| A static page | 1,896 B | 12,037 B | −84% |
+| A counter | 3,004 B | 12,931 B | −77% |
+| The same, hydrated | 3,487 B | 13,653 B | −74% |
+| A keyed list | 5,469 B | 14,754 B | −63% |
+| An element with spread attributes | 6,045 B | 16,547 B | −63% |
+| A TodoMVC-style app, three components | 8,237 B | 18,196 B | −55% |
+| The same with a transition and an animation | 10,571 B | 20,050 B | −47% |
 
 Transitions and animations are the clearest case of paying only for what is used: their
 plumbing in effects and `{#each}` is behind two flags that only `transition()` and
@@ -91,8 +94,79 @@ many tests each feature accounts for.
   implementations. The scheduler is synchronous: there are no batches that hold their own
   view of the state.
 - **Custom renderers.**
+- **The API that Svelte deprecates.** These are gone from the runtime, the entry points and
+  the types:
 
-Using one of these fails with an error that says so, when compiling where that is possible.
+  | Removed | Use instead |
+  | --- | --- |
+  | `createEventDispatcher` | Callback props (`let { onselect } = $props()`); in a custom element, `$host().dispatchEvent(...)` |
+  | `beforeUpdate`, `afterUpdate` | `$effect.pre`, `$effect` |
+  | The `events` option of `mount` and `hydrate` | Callback props |
+  | `svelte/legacy`: `createClassComponent`, `asClassComponent` | `mount`, `hydrate`, `unmount` |
+  | `svelte/legacy`: `run` | `$effect.pre` |
+  | `svelte/legacy`: `handlers`, `createBubbler`, and `once`, `preventDefault`, `self`, `stopPropagation`, `stopImmediatePropagation`, `trusted`, `passive`, `nonpassive` | A function that calls the handlers, a callback prop, the same lines in the handler, `on()` of `svelte/events` with its options |
+  | `spring` and `tweened` of `svelte/motion` | The `Spring` and `Tween` classes |
+  | The compiler option `compatibility.componentApi: 4` | `mount` |
+
+  An import of one of these fails when bundling. The `events` option is the exception: a
+  bundler does not look into options, and passing it does nothing.
+- **Syntax that svelte-lite does not support.** The deprecated syntax, also where Svelte's
+  compiler turns it into something svelte-lite could run, besides what needs legacy mode,
+  `experimental.async` or a custom renderer:
+
+  | Rejected | Write instead |
+  | --- | --- |
+  | `on:click={handler}`, also on `<svelte:window>`, `<svelte:document>`, `<svelte:body>` | `onclick={handler}` |
+  | Its modifiers: `\|preventDefault`, `\|stopPropagation`, `\|stopImmediatePropagation`, `\|self`, `\|trusted` | The same in the handler: `event.preventDefault()`, `if (event.target === event.currentTarget)`, `if (event.isTrusted)` |
+  | `\|capture`, `\|once`, `\|passive`, `\|nonpassive` | `onclickcapture`; `on(element, type, handler, options)` of `svelte/events` |
+  | `on:click` without a handler (forwarding) | A callback prop, passed on: `<button {onclick}>` |
+  | `on:done={handler}` on a component | A callback prop: `ondone={handler}` |
+  | `<slot>`, `<slot name="x">`, outside a custom element | `{@render children?.()}`, `{@render x?.()}` |
+  | `slot="x"`, `<svelte:fragment slot="x">` | `{#snippet x()}...{/snippet}` |
+  | `let:item` | `{#snippet children(item)}...{/snippet}` |
+  | `<svelte:component this={C}>` | `<C />` |
+  | `<svelte:self>` | The component importing itself |
+  | `<script context="module">` | `<script module>` |
+  | `accessors` and `immutable` in `<svelte:options>` | Nothing: they have no effect in runes mode |
+  | `export let`, `$:`, `$$props`, `$$restProps`, `runes={false}`, `attr={a, b}` (legacy mode) | `$props()`, `$derived` or `$effect`, `$props()`, a rest element in `$props()`, nothing, `attr={(a, b)}` |
+  | `await` in markup or at the top level of a component (`experimental.async`) | `{#await}`, or an `$effect` |
+  | `customRenderer` in `<svelte:options>` | Nothing: svelte-lite renders to the DOM |
+
+  `<slot>` and `$$slots` stay in a custom element, which renders its light DOM children
+  through them.
+
+Using one of these fails with an error that says so: when compiling through svelte-lite's
+compiler entry point, and otherwise when bundling or with [the syntax check](#the-syntax-check).
+
+### The syntax check
+
+`src/compiler/index.ts` rejects the syntax above in every component it compiles, with where it
+is and what to write instead:
+
+```
+svelte-lite does not support `on:click`, an `on:` directive (src/App.svelte:3:9): use the `onclick` attribute
+```
+
+A build that calls Svelte's compiler directly, as SvelteKit does through vite-plugin-svelte,
+does not go through it. The same check runs on its own before such a build, and exits with 1
+if it finds anything:
+
+```sh
+bun run check:syntax src                 # in this repo, or
+bun <svelte-lite>/check/cli.ts src       # from a SvelteKit app, on its own components
+```
+
+It takes files and directories (searched for `.svelte` files, skipping `node_modules`), and
+`--custom-element` for components compiled with `customElement: true`. It works from the AST
+of Svelte's own parser, and is a function too (`check(source, options)` of `check/index.ts`),
+for a build plugin to call. Its rules are one table, `RULES` in `check/index.ts`.
+
+`bun check/cross-check.ts` holds it against Svelte's compiler over the 5,189 components in the
+suite's samples: the check finds something exactly where the compiler, in runes mode without
+`experimental.async`, warns about deprecated syntax or fails on legacy or `await` syntax, at the
+same position. Besides that it finds the deprecated syntax that the compiler does not warn
+about: `on:` on a component, forwarding from one, `let:`, `slot="x"`, `<svelte:fragment>` and
+`on:` on `<svelte:window>`. It takes about 0.1 ms per component.
 
 ### Behaviour that differs from Svelte
 
@@ -191,6 +265,11 @@ What differs from upstream is where imports lead, which `harness/` decides:
 - Some tests import Svelte's internals by path, such as `../../src/internal/client/proxy.js`.
   Those resolve to the file with the same path under `compat/`.
   See [compat/README.md](compat/README.md).
+- Three drivers of the suite mount the component of each sample with `createClassComponent`
+  of `svelte/legacy`, which svelte-lite removed. Those files, and only those, get a stand-in
+  built on `mount` and `hydrate` (`harness/support/legacy.ts`, listed in `harness/removed.ts`).
+  It is test support: nothing in `package.json` leads to it. Anything else that imports
+  `svelte/legacy` fails.
 - Loading a module of the real Svelte that is neither reused nor still borrowed is an error,
   so a test cannot pass against the wrong implementation by accident. The same goes for the
   bundles that the browser tests build with esbuild. The type tests only accept types of
@@ -214,7 +293,8 @@ This moves the submodule to the tip of Svelte's `main`, then:
 
 1. pins dependencies to the new lockfile (`bun run upstream:sync-deps`)
 2. creates `compat/` shims for internals that tests newly import (`bun run compat:audit --scaffold`)
-3. checks that `package.json` still has every entry point upstream has (`bun test`)
+3. checks that `package.json` still has every entry point upstream has, minus those that
+   `harness/removed.ts` lists (`bun test`)
 4. runs the suite against the new Svelte to get a new baseline (`bun run test:upstream`)
 
 If `vitest.config.js` changed upstream, a warning says so until the change is carried over to
@@ -225,9 +305,10 @@ If `vitest.config.js` changed upstream, a warning says so until the change is ca
 | Path | Contents |
 | --- | --- |
 | `src/` | svelte-lite, in the layout of Svelte's `src/` |
+| `check/` | The syntax check, its command line, its tests and its comparison with the compiler |
 | `compat/` | Shims for the Svelte internals that tests import |
 | `scope.json` | The features left out, and the tests that fail because of them |
-| `harness/` | Import resolution, the scoreboard and their tests |
+| `harness/` | Import resolution, the scoreboard, the list of removed API with the stand-ins the suite's drivers get for it, and their tests |
 | `scripts/` | Setup, test runner, type tests, and the tools for updating Svelte |
 | `vendor/svelte/` | The pinned Svelte checkout (submodule) |
 | `.results/` | Results of the last full run of each implementation (not committed) |
