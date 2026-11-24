@@ -208,6 +208,14 @@ export const RULES: Rule[] = [
 		}
 	},
 	{
+		code: 'let_directive',
+		kind: 'deprecated',
+		node: 'LetDirective',
+		found: (node) => `\`let:${node.name}\`, which takes a value that a slot passes`,
+		instead: (node) =>
+			`take it as a parameter of the snippet that you pass: \`{#snippet children(${node.name})}\``
+	},
+	{
 		code: 'window_event_directive',
 		kind: 'deprecated',
 		node: 'OnDirective',

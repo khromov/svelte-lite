@@ -71,6 +71,13 @@ const cases: Record<string, { found: string[]; fine: string[] }> = {
 		],
 		fine: [`<script>import Child from './Child.svelte';</script><Child>{#snippet header()}x{/snippet}</Child>`]
 	},
+	let_directive: {
+		found: [
+			`<script>import List from './List.svelte';</script><List let:item>{item}</List>`,
+			`<script>import List from './List.svelte';</script><List let:item={{ id }}>{id}</List>`
+		],
+		fine: [`<script>import List from './List.svelte';</script><List>{#snippet children(item)}{item}{/snippet}</List>`]
+	},
 	window_event_directive: {
 		found: [
 			`<svelte:window on:keydown={() => {}} />`,

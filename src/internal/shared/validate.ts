@@ -2,6 +2,7 @@ import { is_void } from '../../utils.ts';
 import * as w from './warnings.ts';
 import * as e from './errors.ts';
 
+// for the server runtime, which is Svelte's: svelte-lite's client has no `let:`
 export { invalid_default_snippet } from './errors.ts';
 
 export function validate_void_dynamic_element(tag_fn: () => string): void {

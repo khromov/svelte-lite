@@ -15,7 +15,8 @@
 // - the deprecated `compatibility.componentApi: 4` option: `add_legacy_event_listener`,
 //   `update_legacy_props` (it also imports `createClassComponent` from `svelte/legacy`)
 // - deprecated syntax: the modifiers of `on:` (`once`, `preventDefault`, `self`,
-//   `stopImmediatePropagation`, `stopPropagation`, `trusted`), event forwarding (`bubble_event`)
+//   `stopImmediatePropagation`, `stopPropagation`, `trusted`), event forwarding (`bubble_event`),
+//   `let:` (`invalid_default_snippet`)
 //
 // A component that needs one of these fails where it is compiled, see `src/compiler/index.ts`:
 // a deprecated option there, deprecated syntax in `check/index.ts`, which also rejects the
@@ -172,7 +173,6 @@ export { attr, clsx } from '../shared/attributes.ts';
 export { snapshot } from '../shared/clone.ts';
 export { noop, fallback, to_array, exclude_from_object } from '../shared/utils.ts';
 export {
-	invalid_default_snippet,
 	validate_dynamic_element_tag,
 	validate_store,
 	validate_void_dynamic_element,

@@ -16,7 +16,8 @@
 		"on-directive": "`on:` directives on elements, deprecated: event attributes (`onclick`) take their place. svelte-lite rejects them when compiling",
 		"event-forwarding": "Event forwarding (`on:click` without a handler), deprecated: a callback prop that the component passes on takes its place. svelte-lite rejects it when compiling",
 		"slot-element": "`<slot>` outside a custom element, deprecated: `{@render ...}` of a snippet prop takes its place. svelte-lite rejects it when compiling",
-		"slot-fill": "Filling a slot with `slot=\"...\"` or `<svelte:fragment>`, deprecated: passing a snippet takes its place. svelte-lite rejects them when compiling"
+		"slot-fill": "Filling a slot with `slot=\"...\"` or `<svelte:fragment>`, deprecated: passing a snippet takes its place. svelte-lite rejects them when compiling",
+		"let-directive": "`let:` directives, deprecated: a snippet that takes the values as parameters takes their place. svelte-lite rejects them when compiling"
 	},
 	"suites": {
 		"runtime-legacy": "legacy",
@@ -297,6 +298,8 @@
 			"snippet-prop-implicit": "on-directive",
 			"snippet-prop-reactive": "on-directive",
 			"snippet-reactive": "on-directive",
+			"snippet-slot-let-error": "let-directive",
+			"snippet-slot-let-renamed-children-error": "let-directive",
 			"snippet-spread": "slot-element",
 			"snippets-as-slots": "slot-element",
 			"state-snapshot": "on-directive",

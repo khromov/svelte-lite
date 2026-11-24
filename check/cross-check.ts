@@ -44,6 +44,7 @@ const SILENT: Record<string, { when?: (finding: Finding) => boolean; why: string
 	},
 	slot_attribute: { why: 'the compiler warns about `<slot>` in the child, not about filling one in the parent' },
 	svelte_fragment: { why: 'the compiler warns about `<slot>` in the child, not about filling one in the parent' },
+	let_directive: { why: 'the compiler warns about `<slot>` in the child, not about taking its values in the parent' },
 	event_forwarding: {
 		when: (finding) => finding.parent !== 'RegularElement' && finding.parent !== 'SvelteElement',
 		why: 'forwarding from a component or `<svelte:window>`: the compiler only warns about `on:` on elements'
