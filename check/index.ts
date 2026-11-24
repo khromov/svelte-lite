@@ -184,6 +184,30 @@ export const RULES: Rule[] = [
 		}
 	},
 	{
+		code: 'slot_attribute',
+		kind: 'deprecated',
+		node: 'Attribute',
+		// on a child of a component, where it fills a slot (`<svelte:fragment>` has a rule of
+		// its own). Anywhere else it is the attribute of HTML, for the slots of shadow DOM
+		when: (node, context) =>
+			node.name === 'slot' &&
+			parent(context)!.type !== 'SvelteFragment' &&
+			context.path.at(-2)?.type === 'Fragment' &&
+			COMPONENTS.has(context.path.at(-3)?.type!),
+		found: (node) => `\`slot="${text(node) ?? '...'}"\`, which fills a slot of the component`,
+		instead: (node) => `pass a snippet: \`{#snippet ${text(node) ?? 'name'}()}...{/snippet}\``
+	},
+	{
+		code: 'svelte_fragment',
+		kind: 'deprecated',
+		node: 'SvelteFragment',
+		found: () => '`<svelte:fragment>`, which fills a slot of the component',
+		instead: (node) => {
+			const slot = text(node.attributes.find((a: Node) => a.type === 'Attribute' && a.name === 'slot'));
+			return `pass a snippet: \`{#snippet ${slot ?? 'children'}()}...{/snippet}\``;
+		}
+	},
+	{
 		code: 'window_event_directive',
 		kind: 'deprecated',
 		node: 'OnDirective',

@@ -15,7 +15,8 @@
 		"component-api-4": "The deprecated `compatibility.componentApi: 4` compiler option, which makes components classes through `svelte/legacy`: `mount` takes its place",
 		"on-directive": "`on:` directives on elements, deprecated: event attributes (`onclick`) take their place. svelte-lite rejects them when compiling",
 		"event-forwarding": "Event forwarding (`on:click` without a handler), deprecated: a callback prop that the component passes on takes its place. svelte-lite rejects it when compiling",
-		"slot-element": "`<slot>` outside a custom element, deprecated: `{@render ...}` of a snippet prop takes its place. svelte-lite rejects it when compiling"
+		"slot-element": "`<slot>` outside a custom element, deprecated: `{@render ...}` of a snippet prop takes its place. svelte-lite rejects it when compiling",
+		"slot-fill": "Filling a slot with `slot=\"...\"` or `<svelte:fragment>`, deprecated: passing a snippet takes its place. svelte-lite rejects them when compiling"
 	},
 	"suites": {
 		"runtime-legacy": "legacy",
@@ -34,6 +35,7 @@
 			"general-siblings-combinator-nested-slots": "legacy",
 			"general-siblings-combinator-nested-slots-flattened": "legacy",
 			"general-siblings-combinator-selects-slot-fallback": "legacy",
+			"general-siblings-combinator-slot": "slot-fill",
 			"general-siblings-combinator-slot-global": "legacy",
 			"general-siblings-combinator-slots-between": "legacy",
 			"nested": "legacy",
@@ -47,6 +49,7 @@
 			"siblings-combinator-nested-slots": "legacy",
 			"siblings-combinator-nested-slots-flattened": "legacy",
 			"siblings-combinator-selects-slot-fallback": "legacy",
+			"siblings-combinator-slot": "slot-fill",
 			"siblings-combinator-slot-named-between-default": "slot-element",
 			"siblings-combinator-slots-between": "legacy",
 			"spread": "legacy",
@@ -269,6 +272,7 @@
 			"pre-effect": "on-directive",
 			"pre-effect-ordering": "on-directive",
 			"props-alias": "on-directive",
+			"props-and-slots": "slot-fill",
 			"props-bound": "on-directive",
 			"props-bound-fallback": "on-directive",
 			"props-bound-to-normal": "on-directive",
@@ -279,6 +283,7 @@
 			"runes-in-module-context": "on-directive",
 			"slot": "slot-element",
 			"slot-static": "slot-element",
+			"slot-svelte-fragment-render-tag": "slot-fill",
 			"snippet-argument": "on-directive",
 			"snippet-argument-destructured": "on-directive",
 			"snippet-argument-destructured-multiple": "on-directive",

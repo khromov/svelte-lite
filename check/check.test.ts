@@ -53,6 +53,24 @@ const cases: Record<string, { found: string[]; fine: string[] }> = {
 			`<div slot="x"></div>`
 		]
 	},
+	slot_attribute: {
+		found: [
+			`<script>import Child from './Child.svelte';</script><Child><p slot="header">x</p></Child>`,
+			`<script>import Child from './Child.svelte';</script><Child><Child slot="body" /></Child>`
+		],
+		fine: [
+			`<script>import Child from './Child.svelte';</script><Child>{#snippet header()}<p>x</p>{/snippet}</Child>`,
+			`<my-element><p slot="header">x</p></my-element>`,
+			`<div><span slot="a">x</span></div>`
+		]
+	},
+	svelte_fragment: {
+		found: [
+			`<script>import Child from './Child.svelte';</script><Child><svelte:fragment slot="header">x</svelte:fragment></Child>`,
+			`<script>import Child from './Child.svelte';</script><Child><svelte:fragment>x</svelte:fragment></Child>`
+		],
+		fine: [`<script>import Child from './Child.svelte';</script><Child>{#snippet header()}x{/snippet}</Child>`]
+	},
 	window_event_directive: {
 		found: [
 			`<svelte:window on:keydown={() => {}} />`,

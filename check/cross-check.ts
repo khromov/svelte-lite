@@ -42,6 +42,8 @@ const SILENT: Record<string, { when?: (finding: Finding) => boolean; why: string
 	component_event: {
 		why: 'the compiler does not warn about `on:` on a component, as the component may not be the author\'s to change'
 	},
+	slot_attribute: { why: 'the compiler warns about `<slot>` in the child, not about filling one in the parent' },
+	svelte_fragment: { why: 'the compiler warns about `<slot>` in the child, not about filling one in the parent' },
 	event_forwarding: {
 		when: (finding) => finding.parent !== 'RegularElement' && finding.parent !== 'SvelteElement',
 		why: 'forwarding from a component or `<svelte:window>`: the compiler only warns about `on:` on elements'
