@@ -98,6 +98,14 @@ const cases: Record<string, { found: string[]; fine: string[] }> = {
 		found: [`<script context="module">export const a = 1;</script>`],
 		fine: [`<script module>export const a = 1;</script>`, `<script lang="ts">let a: number = 1;</script>`]
 	},
+	options_accessors: {
+		found: [`<svelte:options accessors /><p>x</p>`, `<svelte:options accessors={false} /><p>x</p>`],
+		fine: [`<svelte:options namespace="html" /><p>x</p>`]
+	},
+	options_immutable: {
+		found: [`<svelte:options immutable /><p>x</p>`, `<svelte:options immutable={true} /><p>x</p>`],
+		fine: [`<svelte:options css="injected" /><p>x</p>`]
+	},
 	window_event_directive: {
 		found: [
 			`<svelte:window on:keydown={() => {}} />`,

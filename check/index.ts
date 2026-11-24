@@ -245,6 +245,22 @@ export const RULES: Rule[] = [
 		instead: () => 'write `<script module>`'
 	},
 	{
+		code: 'options_accessors',
+		kind: 'deprecated',
+		node: 'Attribute',
+		when: (node, context) => context.region === 'options' && node.name === 'accessors',
+		found: () => '`accessors` in `<svelte:options>`, which has no effect in runes mode',
+		instead: () => 'remove it: a component exposes what it exports'
+	},
+	{
+		code: 'options_immutable',
+		kind: 'deprecated',
+		node: 'Attribute',
+		when: (node, context) => context.region === 'options' && node.name === 'immutable',
+		found: () => '`immutable` in `<svelte:options>`, which has no effect in runes mode',
+		instead: () => 'remove it: what changes is known from `$state`, not from comparing values'
+	},
+	{
 		code: 'window_event_directive',
 		kind: 'deprecated',
 		node: 'OnDirective',
