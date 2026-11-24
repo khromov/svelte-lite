@@ -1,6 +1,5 @@
 import type { Source, Task } from '../internal/client/types.ts';
-import type { Tweened, TweenOptions } from './public.ts';
-import { writable } from '../store/shared/index.ts';
+import type { TweenOptions } from './public.ts';
 import { raf } from '../internal/client/timing.ts';
 import { loop } from '../internal/client/loop.ts';
 import { linear } from '../easing/index.ts';
@@ -64,75 +63,6 @@ function get_interpolator(a: any, b: any): (t: number) => any {
 
 	// for non-numeric values, snap to the final value immediately
 	return () => b;
-}
-
-/**
- * A tweened store in Svelte is a special type of store that provides smooth transitions between state values over time.
- *
- * @deprecated Use [`Tween`](https://svelte.dev/docs/svelte/svelte-motion#Tween) instead
- */
-export function tweened<T>(value?: T, defaults: TweenOptions<T> = {}): Tweened<T> {
-	const store = writable(value);
-	let task: Task;
-	let target_value = value;
-
-	function set(new_value: T, opts?: TweenOptions<T>): Promise<void> {
-		target_value = new_value;
-
-		if (value == null) {
-			store.set((value = new_value));
-			return Promise.resolve();
-		}
-
-		let previous_task: Task | null = task;
-
-		let started = false;
-		let {
-			delay = 0,
-			duration = 400,
-			easing = linear,
-			interpolate = get_interpolator
-		} = { ...defaults, ...opts };
-
-		if (duration === 0) {
-			if (previous_task) {
-				previous_task.abort();
-				previous_task = null;
-			}
-			store.set((value = target_value));
-			return Promise.resolve();
-		}
-
-		const start = raf.now() + delay;
-
-		let fn: (t: number) => T;
-		task = loop((now) => {
-			if (now < start) return true;
-			if (!started) {
-				fn = interpolate(value as T, new_value);
-				if (typeof duration === 'function') duration = duration(value as T, new_value);
-				started = true;
-			}
-			if (previous_task) {
-				previous_task.abort();
-				previous_task = null;
-			}
-			const elapsed = now - start;
-			if (elapsed > (duration as number)) {
-				store.set((value = new_value));
-				return false;
-			}
-			store.set((value = fn(easing(elapsed / (duration as number)))));
-			return true;
-		});
-		return task.promise;
-	}
-
-	return {
-		set,
-		update: (fn, opts) => set(fn(target_value as T, value as T), opts),
-		subscribe: store.subscribe
-	};
 }
 
 /**

@@ -17,6 +17,11 @@ export const REMOVED_EXPORTS: RemovedExports[] = [
 		feature: '`beforeUpdate` and `afterUpdate`',
 		module: 'svelte',
 		names: ['beforeUpdate', 'afterUpdate']
+	},
+	{
+		feature: 'the `spring` and `tweened` stores',
+		module: 'svelte/motion',
+		names: ['spring', 'tweened', 'Tweened', 'Updater']
 	}
 ];
 

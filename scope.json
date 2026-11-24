@@ -9,7 +9,8 @@
 		"spread": "Special cases of inputs, `autofocus` and custom elements in spread attributes",
 		"action-deep-read": "`use:` actions updating when their parameter is mutated in place",
 		"error-codes": "Named error codes in production builds",
-		"mount-events": "The deprecated `events` option of `mount` and `hydrate`: callback props take its place"
+		"mount-events": "The deprecated `events` option of `mount` and `hydrate`: callback props take its place",
+		"motion-stores": "The deprecated `spring` and `tweened` stores of `svelte/motion`: the `Spring` and `Tween` classes take their place"
 	},
 	"suites": {
 		"runtime-legacy": "legacy",
@@ -70,6 +71,13 @@
 			"noscript": "legacy",
 			"raw": "legacy",
 			"raw-repair": "legacy"
+		},
+		"motion": {
+			"motion > spring > handles initially undefined values": "motion-stores",
+			"motion > tweened > handles initially undefined values": "motion-stores",
+			"motion > tweened > sets immediately when duration is 0": "motion-stores",
+			"motion > tweened > updates correctly when initialized with a `null`-ish value": "motion-stores",
+			"motion > tweened > updates non-numeric values immediately": "motion-stores"
 		},
 		"runtime-browser": {
 			"custom-elements > $$props": "legacy",
