@@ -10,7 +10,9 @@
 		"action-deep-read": "`use:` actions updating when their parameter is mutated in place",
 		"error-codes": "Named error codes in production builds",
 		"mount-events": "The deprecated `events` option of `mount` and `hydrate`: callback props take its place",
-		"motion-stores": "The deprecated `spring` and `tweened` stores of `svelte/motion`: the `Spring` and `Tween` classes take their place"
+		"motion-stores": "The deprecated `spring` and `tweened` stores of `svelte/motion`: the `Spring` and `Tween` classes take their place",
+		"svelte-legacy": "`svelte/legacy`, deprecated as a whole: `mount` and `hydrate` take the place of `createClassComponent` and `asClassComponent`, `$effect.pre` that of `run`, plain functions that of `handlers` and the event modifier functions, callback props that of `createBubbler`",
+		"component-api-4": "The deprecated `compatibility.componentApi: 4` compiler option, which makes components classes through `svelte/legacy`: `mount` takes its place"
 	},
 	"suites": {
 		"runtime-legacy": "legacy",
@@ -171,6 +173,8 @@
 			"fine-grained-prop-reactive-statement": "legacy",
 			"form-default-value-spread": "spread",
 			"input-type-before-value-spread": "spread",
+			"legacy-class-transformation": "component-api-4",
+			"legacy-recursive-reactive-block": "svelte-legacy",
 			"legacy-runes-ambiguous-explicit-false": "legacy",
 			"legacy-runes-ambiguous-export-$$props": "legacy",
 			"legacy-runes-ambiguous-export-$$restProps": "legacy",
@@ -179,6 +183,7 @@
 			"legacy-runes-ambiguous-export-let-2": "legacy",
 			"manual-mount (dom)": "mount-events",
 			"manual-mount (hydrate)": "mount-events",
+			"mount-props-updates": "svelte-legacy",
 			"svelte-meta-native-slot": "legacy",
 			"transition-outro-teardown-context": "teardown-old-values",
 			"transition-outro-teardown-derived-cache": "teardown-old-values"
@@ -217,6 +222,7 @@
 			"helpers": "legacy",
 			"if-block-false": "legacy",
 			"if-block-true": "legacy",
+			"legacy-imports": "svelte-legacy",
 			"raw-mustaches": "legacy",
 			"textarea-children": "legacy",
 			"textarea-value": "legacy",

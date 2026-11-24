@@ -191,6 +191,11 @@ What differs from upstream is where imports lead, which `harness/` decides:
 - Some tests import Svelte's internals by path, such as `../../src/internal/client/proxy.js`.
   Those resolve to the file with the same path under `compat/`.
   See [compat/README.md](compat/README.md).
+- Three drivers of the suite mount the component of each sample with `createClassComponent`
+  of `svelte/legacy`, which svelte-lite removed. Those files, and only those, get a stand-in
+  built on `mount` and `hydrate` (`harness/support/legacy.ts`, listed in `harness/removed.ts`).
+  It is test support: nothing in `package.json` leads to it. Anything else that imports
+  `svelte/legacy` fails.
 - Loading a module of the real Svelte that is neither reused nor still borrowed is an error,
   so a test cannot pass against the wrong implementation by accident. The same goes for the
   bundles that the browser tests build with esbuild. The type tests only accept types of

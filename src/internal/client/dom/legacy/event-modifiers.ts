@@ -1,10 +1,5 @@
-import { noop } from '../../../shared/utils.ts';
-import { user_pre_effect } from '../../reactivity/effects.ts';
-import { on } from '../elements/events.ts';
-
 // The modifiers of an `on:` directive, which is deprecated and still valid in a runes
 // component: `on:click|once|preventDefault={handler}` compiles to `$.once($.preventDefault(handler))`.
-// `svelte/legacy` exports the same functions for components that were migrated by hand.
 
 type Handler = (event: Event, ...args: unknown[]) => void;
 
@@ -83,34 +78,4 @@ export function preventDefault(fn: Handler): Handler {
 		event.preventDefault();
 		return fn?.apply(this, args);
 	};
-}
-
-/**
- * Substitute for the `passive` event modifier, implemented as an action
- * @deprecated
- */
-export function passive(
-	node: HTMLElement,
-	[event, handler]: [event: string, handler: () => EventListener]
-): void {
-	user_pre_effect(() => {
-		return on(node, event, handler() ?? noop, {
-			passive: true
-		});
-	});
-}
-
-/**
- * Substitute for the `nonpassive` event modifier, implemented as an action
- * @deprecated
- */
-export function nonpassive(
-	node: HTMLElement,
-	[event, handler]: [event: string, handler: () => EventListener]
-): void {
-	user_pre_effect(() => {
-		return on(node, event, handler() ?? noop, {
-			passive: false
-		});
-	});
 }

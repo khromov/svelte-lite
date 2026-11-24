@@ -64,12 +64,6 @@
 		"./internal/server": {
 			"default": "./src/internal/server/index.ts"
 		},
-		"./legacy": {
-			"svelte-custom-renderer": "./src/legacy/legacy-client.ts",
-			"worker": "./src/legacy/legacy-server.ts",
-			"browser": "./src/legacy/legacy-client.ts",
-			"default": "./src/legacy/legacy-server.ts"
-		},
 		"./motion": {
 			"types": "./src/motion/public.ts",
 			"default": "./src/motion/index.ts"

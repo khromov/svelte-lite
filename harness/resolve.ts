@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { COMPAT, ROOT, UPSTREAM_PKG, UPSTREAM_SRC, is_inside, type Impl } from './paths.ts';
+import { removed_entry_point, stand_in } from './removed.ts';
 
 /** Thrown when the harness itself is misconfigured, as opposed to a test failing */
 export class HarnessError extends Error {
@@ -119,7 +120,6 @@ const REUSED = [
 	'internal/server/',
 	'server/',
 	'index-server.js',
-	'legacy/legacy-server.js',
 	'reactivity/index-server.js',
 	'renderer/index-server.js',
 	'store/index-server.js'
@@ -177,6 +177,14 @@ export function create_resolver(impl: Impl, options: { force_server?: boolean } 
 		const subpath = svelte_subpath(specifier);
 
 		if (subpath !== null) {
+			if (impl === 'lite') {
+				const support = stand_in(specifier, importer && clean_id(importer));
+				if (support) return support;
+
+				const removed = removed_entry_point(specifier);
+				if (removed) throw new Error(`${removed} (imported by ${importer})`);
+			}
+
 			// compiled server output has to get the server build of the runtime
 			const use_server = options.force_server || !!importer?.includes('_output/server');
 			const resolved = resolve_export(pkg_dir, pkg, subpath, use_server);

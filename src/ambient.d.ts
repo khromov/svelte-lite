@@ -4,7 +4,7 @@
 declare module '*.svelte' {
 	// An ambient module cannot import by relative path, so the types are named in place.
 	// `Comp` can be used as both a class and a function during the transition period,
-	// which is what `LegacyComponentType` of `svelte/legacy` describes
+	// which is what `LegacyComponentType` of Svelte's `svelte/legacy` describes
 	const Comp: {
 		new (o: import('./index.ts').ComponentConstructorOptions): import('./index.ts').SvelteComponent;
 		(

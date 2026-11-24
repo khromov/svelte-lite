@@ -47,6 +47,31 @@ describe('resolving for svelte-lite', () => {
 		expect(() => resolve('svelte/action', upstream_test('store/test.ts'))).toThrow(HarnessError);
 	});
 
+	test('the drivers that mount components with `svelte/legacy` get a stand-in', () => {
+		const support = own('harness/support/legacy.ts');
+
+		expect(resolve('svelte/legacy', upstream_test('runtime-browser/driver.js'))).toBe(support);
+		expect(resolve('svelte/legacy', upstream_test('hydration/test.ts'))).toBe(support);
+		expect(resolve('svelte/legacy', upstream_test('runtime-legacy/shared.ts'))).toBe(support);
+		// as Vite names the importer
+		expect(resolve('svelte/legacy', `${upstream_test('hydration/test.ts')}?v=1`)).toBe(support);
+	});
+
+	test('anything else that imports `svelte/legacy` fails, and says why', () => {
+		const importers = [
+			upstream_test('runtime-runes/samples/mount-props-updates/main.svelte'),
+			upstream_test('runtime-browser/assert.js'),
+			own('src/index-client.ts')
+		];
+
+		for (const importer of importers) {
+			expect(() => resolve('svelte/legacy', importer)).toThrow(/svelte-lite removed svelte\/legacy/);
+		}
+
+		// not even a driver gets anything else that was removed
+		expect(() => resolve('svelte/legacy', undefined)).toThrow(/svelte-lite removed/);
+	});
+
 	test('relative imports of upstream internals go to compat/', () => {
 		expect(
 			resolve('../../src/internal/client/reactivity/batch.js', upstream_test('runtime-legacy/shared.ts'))
@@ -266,6 +291,25 @@ describe('bundling with esbuild for svelte-lite', () => {
 		expect(inputs(result)).not.toContain('src/index-client.ts');
 	});
 
+	test('the driver gets the stand-in for `svelte/legacy`, and nothing else does', async () => {
+		const driver = await build({
+			...options,
+			entryPoints: [upstream_test('runtime-browser/driver.js')],
+			// what tests/runtime-browser/test.ts points these to does not matter here, as long as
+			// they have a default export
+			alias: {
+				__MAIN_DOT_SVELTE__: own('package.json'),
+				__CONFIG__: own('package.json'),
+				'assert.js': upstream_test('runtime-browser/assert.js')
+			}
+		});
+
+		expect(inputs(driver)).toContain('harness/support/legacy.ts');
+
+		const other = build({ ...options, stdin: stdin(`import 'svelte/legacy'`) });
+		await expect(other).rejects.toThrow(/svelte-lite removed svelte\/legacy/);
+	});
+
 	test('upstream sources are refused', async () => {
 		const file = upstream_src('internal/flags/legacy.js');
 		const result = build({ ...options, stdin: stdin(`import ${JSON.stringify(file)}`) });
@@ -278,11 +322,14 @@ describe('package.json', () => {
 	const upstream = read_package(UPSTREAM_PKG).exports;
 	const exports = read_package(ROOT).exports;
 
-	test('has the entry points of the upstream package', () => {
-		expect(Object.keys(exports).sort()).toEqual(Object.keys(upstream).sort());
+	/** `./legacy` → `svelte/legacy` */
+	const removed = (key: string) => removed_from(`svelte${key.slice(1)}`) === '*';
+
+	test('has the entry points of the upstream package, minus the removed ones', () => {
+		expect(Object.keys(exports).sort()).toEqual(Object.keys(upstream).filter((key) => !removed(key)).sort());
 
 		for (const [key, entry] of Object.entries(upstream)) {
-			if (typeof entry === 'string') continue;
+			if (typeof entry === 'string' || removed(key)) continue;
 
 			// upstream builds its types and a CommonJS compiler, this package is its sources
 			const conditions = Object.keys(entry).filter((c) => c !== 'types' && c !== 'require');
@@ -306,6 +353,16 @@ describe('package.json', () => {
 			for (const file of typeof entry === 'string' ? [entry] : Object.values(entry)) {
 				expect([file, fs.existsSync(own(file))]).toEqual([file, true]);
 			}
+		}
+	});
+
+	test('test support is not part of what ships', () => {
+		const files = Object.values(exports)
+			.flatMap((entry) => (typeof entry === 'string' ? [entry] : Object.values(entry)))
+			.filter((file) => file !== './package.json');
+
+		for (const file of files) {
+			expect([file, path.resolve(ROOT, file).startsWith(own('src') + path.sep)]).toEqual([file, true]);
 		}
 	});
 });
