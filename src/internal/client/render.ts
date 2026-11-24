@@ -72,7 +72,6 @@ export function hydrate<
 		? {
 				target: Document | Element | ShadowRoot;
 				props?: Props;
-				events?: Record<string, (e: any) => any>;
 				context?: Map<any, any>;
 				intro?: boolean;
 				recover?: boolean;
@@ -81,7 +80,6 @@ export function hydrate<
 		: {
 				target: Document | Element | ShadowRoot;
 				props: Props;
-				events?: Record<string, (e: any) => any>;
 				context?: Map<any, any>;
 				intro?: boolean;
 				recover?: boolean;
@@ -142,7 +140,7 @@ export function hydrate<
 
 function _mount<Exports extends Record<string, any>>(
 	Component: ComponentType<SvelteComponent<any>> | Component<any, any, any>,
-	{ target, anchor, props = {}, events, context, intro = true, transformError }: Options
+	{ target, anchor, props = {}, context, intro = true, transformError }: Options
 ): Exports {
 	// will be defined because the render effect runs synchronously
 	var component = undefined as unknown as Exports;
@@ -159,11 +157,6 @@ function _mount<Exports extends Record<string, any>>(
 			push({});
 			var ctx = component_context as ComponentContext;
 			if (context) ctx.c = context;
-
-			if (events) {
-				// We can't spread the object or else we'd lose the state proxy stuff, if it is one
-				props.$$events = events;
-			}
 
 			if (hydrating) {
 				assign_nodes(anchor_node as TemplateNode, null);

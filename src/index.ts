@@ -332,11 +332,6 @@ export type MountOptions<
 	 */
 	anchor?: Node;
 	/**
-	 * Allows the specification of events.
-	 * @deprecated Use callback props instead.
-	 */
-	events?: Record<string, (e: any) => any>;
-	/**
 	 * Can be accessed via `getContext()` at the component level.
 	 */
 	context?: Map<any, any>;
