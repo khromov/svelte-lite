@@ -14,8 +14,13 @@
 //   `pop_renderer`, `cross`, `is_crossing`
 // - the deprecated `compatibility.componentApi: 4` option: `add_legacy_event_listener`,
 //   `update_legacy_props` (it also imports `createClassComponent` from `svelte/legacy`)
+// - deprecated syntax: the modifiers of `on:` on an element (`preventDefault`, `self`,
+//   `stopImmediatePropagation`, `stopPropagation`, `trusted`)
 //
-// A component that needs one of these fails where it is compiled, see `src/compiler/index.ts`.
+// A component that needs one of these fails where it is compiled, see `src/compiler/index.ts`:
+// a deprecated option there, deprecated syntax in `check/index.ts`, which also rejects the
+// deprecated syntax whose helpers are shared with what is not deprecated (`on:click` on an
+// element is `event`, as `onclick` is when it is not delegated).
 //
 // Some of what stays looks like it belongs to those features and does not:
 //
@@ -104,14 +109,7 @@ export {
 } from './dom/elements/bindings/universal.ts';
 export { bind_window_scroll, bind_window_size } from './dom/elements/bindings/window.ts';
 export { hydrate_template, next, reset } from './dom/hydration.ts';
-export {
-	once,
-	preventDefault,
-	self,
-	stopImmediatePropagation,
-	stopPropagation,
-	trusted
-} from './dom/legacy/event-modifiers.ts';
+export { once } from './dom/legacy/event-modifiers.ts';
 export { bubble_event } from './dom/legacy/misc.ts';
 export {
 	append,

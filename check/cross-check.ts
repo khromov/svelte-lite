@@ -30,7 +30,11 @@ const GATED_ERRORS = new Set([
 ]);
 
 /** The compiler says nothing about these, which is why they are rules: see the report */
-const SILENT: Record<string, string> = {};
+const SILENT: Record<string, string> = {
+	window_event_directive:
+		'on `<svelte:window>`, `<svelte:document>` and `<svelte:body>`, `on:` is just as deprecated, ' +
+		'but the compiler only warns about it on elements'
+};
 
 interface Signal {
 	code: string;

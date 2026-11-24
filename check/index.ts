@@ -78,6 +78,33 @@ interface Rule {
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 
+const ELEMENTS = new Set(['RegularElement', 'SvelteElement']);
+
+/** The special elements that `on:` can listen on as well */
+const TARGETS = new Set(['SvelteWindow', 'SvelteDocument', 'SvelteBody']);
+
+/** `on:click|once|preventDefault` */
+const directive = (node: Node) => ['on:' + node.name, ...node.modifiers].join('|');
+
+/** What to do in place of the modifiers of an `on:` directive on an element */
+const MODIFIERS: Record<string, string> = {
+	preventDefault: 'call `event.preventDefault()` in the handler',
+	stopPropagation: 'call `event.stopPropagation()` in the handler',
+	stopImmediatePropagation: 'call `event.stopImmediatePropagation()` in the handler',
+	self: 'check `event.target === event.currentTarget` in the handler',
+	trusted: 'check `event.isTrusted` in the handler',
+	once: 'add the listener with `on(element, type, handler, { once: true })` of `svelte/events`',
+	passive: 'add the listener with `on(element, type, handler, { passive: true })` of `svelte/events`',
+	nonpassive: 'add the listener with `on(element, type, handler, { passive: false })` of `svelte/events`'
+};
+
+/** What to write in place of an `on:` directive with a handler, on an element */
+function event_attribute(node: Node) {
+	const capture = node.modifiers.includes('capture') ? 'capture' : '';
+	const rest = node.modifiers.filter((m: string) => m !== 'capture').map((m: string) => MODIFIERS[m]);
+	return [`use the \`on${node.name}${capture}\` attribute`, ...rest].join(', and ');
+}
+
 const parent = (context: Context) => context.path.at(-1);
 
 /** Whether an identifier is a reference to something, as opposed to the name of a property */
@@ -92,6 +119,24 @@ function is_reference(node: Node, context: Context) {
 }
 
 export const RULES: Rule[] = [
+	// ---------------------------------------------------------------- deprecated syntax
+	{
+		code: 'event_directive',
+		kind: 'deprecated',
+		node: 'OnDirective',
+		when: (node, context) => node.expression !== null && ELEMENTS.has(parent(context)!.type),
+		found: (node) => `\`${directive(node)}\`, an \`on:\` directive`,
+		instead: event_attribute
+	},
+	{
+		code: 'window_event_directive',
+		kind: 'deprecated',
+		node: 'OnDirective',
+		when: (node, context) => node.expression !== null && TARGETS.has(parent(context)!.type),
+		found: (node, context) => `\`${directive(node)}\` on \`<${parent(context)!.name}>\`, an \`on:\` directive`,
+		instead: event_attribute
+	},
+
 	// ---------------------------------------------------------------- legacy mode
 	{
 		code: 'export_let',
@@ -310,7 +355,7 @@ export function check(source: string, options: CheckOptions = {}): Finding[] {
 	return findings.sort((a, b) => a.start - b.start);
 }
 
-/** "`on:click`, an `on:` directive (App.svelte:3:8): use the `onclick` attribute" */
+/** "`on:click`, an `on:` directive (App.svelte:3:9): use the `onclick` attribute", with a 1-based column */
 export function describe(finding: Finding, filename = 'the component') {
-	return `${finding.found} (${filename}:${finding.line}:${finding.column}): ${finding.instead}`;
+	return `${finding.found} (${filename}:${finding.line}:${finding.column + 1}): ${finding.instead}`;
 }

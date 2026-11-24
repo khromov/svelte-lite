@@ -15,6 +15,22 @@ const rules = (source: string, options = {}) => check(source, options).map((find
  * nothing at all is found.
  */
 const cases: Record<string, { found: string[]; fine: string[] }> = {
+	event_directive: {
+		found: [
+			`<button on:click={() => {}}>x</button>`,
+			`<form on:submit|preventDefault|once={() => {}}></form>`,
+			`<svelte:element this="div" on:click={() => {}} />`
+		],
+		fine: [`<button onclick={() => {}}>x</button>`, `<div onclickcapture={() => {}}></div>`]
+	},
+	window_event_directive: {
+		found: [
+			`<svelte:window on:keydown={() => {}} />`,
+			`<svelte:document on:visibilitychange={() => {}} />`,
+			`<svelte:body on:mouseenter|once={() => {}} />`
+		],
+		fine: [`<svelte:window onkeydown={() => {}} />`, `<svelte:body onmouseenter={() => {}} />`]
+	},
 	export_let: {
 		found: [`<script>export let x;</script>`, `<script>export let x = 1, y;</script>`],
 		fine: [
@@ -104,6 +120,15 @@ describe('rules', () => {
 });
 
 describe('check', () => {
+	test('says what to do in place of the modifiers of an `on:` directive', () => {
+		const [finding] = check(`<form on:submit|capture|preventDefault={() => {}}></form>`);
+
+		expect(finding.found).toBe('`on:submit|capture|preventDefault`, an `on:` directive');
+		expect(finding.instead).toBe(
+			'use the `onsubmitcapture` attribute, and call `event.preventDefault()` in the handler'
+		);
+	});
+
 	test('reports where it found something, as Svelte does', () => {
 		const [finding] = check(`<script>\n\tlet a = 1;\n\texport let x;\n</script>`);
 
@@ -155,7 +180,7 @@ describe('the compiler entry point', () => {
 			compile(`<svelte:options runes={false} /><p>x</p>`, { filename: 'App.svelte', generate: 'client' })
 		).toThrow(
 			'svelte-lite does not support `runes={false}` in `<svelte:options>`, which selects legacy mode ' +
-				'(App.svelte:1:16): remove it'
+				'(App.svelte:1:17): remove it'
 		);
 	});
 
