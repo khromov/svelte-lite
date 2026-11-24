@@ -216,6 +216,16 @@ export const RULES: Rule[] = [
 			`take it as a parameter of the snippet that you pass: \`{#snippet children(${node.name})}\``
 	},
 	{
+		code: 'svelte_component',
+		kind: 'deprecated',
+		node: 'SvelteComponent',
+		found: () => '`<svelte:component>`, which renders the component that `this` holds',
+		instead: (node) =>
+			node.expression.type === 'Identifier' && /^[A-Z]/.test(node.expression.name)
+				? `use the variable as a tag, \`<${node.expression.name} />\`: components are dynamic in runes mode`
+				: 'hold the component in a capitalised variable, `let Thing = $derived(...)`, and use it as a tag, `<Thing />`'
+	},
+	{
 		code: 'window_event_directive',
 		kind: 'deprecated',
 		node: 'OnDirective',

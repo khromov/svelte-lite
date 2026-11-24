@@ -78,6 +78,16 @@ const cases: Record<string, { found: string[]; fine: string[] }> = {
 		],
 		fine: [`<script>import List from './List.svelte';</script><List>{#snippet children(item)}{item}{/snippet}</List>`]
 	},
+	svelte_component: {
+		found: [
+			`<script>import A from './A.svelte'; let C = $state(A);</script><svelte:component this={C} />`,
+			`<script>let { items } = $props();</script>{#each items as item}<svelte:component this={item.component} />{/each}`
+		],
+		fine: [
+			`<script>import A from './A.svelte'; let C = $state(A);</script><C />`,
+			`<script>let { items } = $props();</script>{#each items as item}<item.component />{/each}`
+		]
+	},
 	window_event_directive: {
 		found: [
 			`<svelte:window on:keydown={() => {}} />`,
