@@ -108,8 +108,9 @@ many tests each feature accounts for.
   | `spring` and `tweened` of `svelte/motion` | The `Spring` and `Tween` classes |
   | The compiler option `compatibility.componentApi: 4` | `mount` |
 
-  An import of one of these fails when bundling. The `events` option is the exception: a
-  bundler does not look into options, and passing it does nothing.
+  An import of one of these fails when bundling. A bundler does not look into options, so
+  passing `events` is an error at runtime instead, in dev builds only. A production build
+  ignores the option.
 - **Syntax that svelte-lite does not support.** The deprecated syntax, also where Svelte's
   compiler turns it into something svelte-lite could run, besides what needs legacy mode,
   `experimental.async` or a custom renderer:

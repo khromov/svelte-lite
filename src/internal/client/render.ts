@@ -17,6 +17,7 @@ import * as e from './errors.ts';
 import { branch, component_root, destroy_effect, pause_effect } from './reactivity/effects.ts';
 import { active_effect } from './runtime.ts';
 import * as w from './warnings.ts';
+import { unsupported } from '../../unsupported.ts';
 
 /**
  * This is normally true — block effects should run their intro transitions —
@@ -43,6 +44,19 @@ export function set_text(text: Text, value: any): void {
 type Options = MountOptions<Record<string, any>>;
 
 /**
+ * Svelte's `mount` and `hydrate` take an `events` option, with handlers for the events that
+ * a component dispatches. svelte-lite has no such events, and nothing reads the option, so
+ * the handlers would never be called and nothing would say why.
+ */
+function reject_events(options: object): void {
+	if ((options as { events?: unknown }).events != null) {
+		unsupported(
+			'the `events` option of `mount` and `hydrate`: pass the handlers as callback props instead'
+		);
+	}
+}
+
+/**
  * Mounts a component to the given target and returns the exports and potentially the props (if compiled with `accessors: true`) of the component.
  * Transitions will play during the initial render unless the `intro` option is set to `false`.
  */
@@ -54,6 +68,8 @@ export function mount<
 	component: ComponentType<SvelteComponent<Props>> | Component<Props, Exports, any>,
 	options: MountOptions<Props, Renderer>
 ): Exports {
+	if (DEV) reject_events(options);
+
 	return _mount(component, options as Options);
 }
 
@@ -86,6 +102,9 @@ export function hydrate<
 				transformError?: (error: unknown) => unknown;
 			}
 ): Exports {
+	// before anything is hydrated: an error from inside would count as a failed hydration
+	if (DEV) reject_events(options);
+
 	options.intro = options.intro ?? false;
 	const target = options.target;
 	const was_hydrating = hydrating;
